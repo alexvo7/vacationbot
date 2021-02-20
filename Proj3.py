@@ -2,10 +2,8 @@ import CYKParse
 import Tree
 
 requestInfo = {
-        'name': '',
         'time': '',
         'location': '',
-
         'time0': '',
         'compare': None,
         'compareWord': ''
@@ -18,7 +16,7 @@ comparing = False
 def getSentenceParse(T):
     sentenceTrees = { k: v for k,v in T.items() if k.startswith('S/0') }
     completeSentenceTree = max(sentenceTrees.keys())
-    #print('getSentenceParse', completeSentenceTree)
+    # print('getSentenceParse', completeSentenceTree)
     return T[completeSentenceTree]
 
 # Processes the leaves of the parse tree to pull out the user's request.
@@ -189,7 +187,7 @@ def main():
     updateRequestInfo(sentenceTree)
     reply()
 
-    T, P = CYKParse.CYKParse("will today be hotter than yesterday in Pasadena".split(), CYKParse.getGrammarWeather())
+    T, P = CYKParse.CYKParse("will today be hotter than today in".split(), CYKParse.getGrammarWeather())
     sentenceTree = getSentenceParse(T)
     updateRequestInfo(sentenceTree)
     reply()

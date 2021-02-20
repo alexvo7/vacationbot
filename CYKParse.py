@@ -3,6 +3,113 @@
 import Tree
 
 verbose = False
+weatherGrammar = {
+    'syntax' : [
+        ['S', 'NP', 'VP', 0.3],
+        ['S', 'WQuestion', 'VP', 0.2],
+
+        ['S', 'WQuestion', 'S', 0.1],
+        ['S', 'AdverbPhrase', 'VP', 0.1],
+        ['S', 'S', 'AdverbPhrase', 0.2],
+
+        ['VP', 'Verb', 'Noun', 0.1],
+        ['VP', 'VP', 'NP', 0.2],
+        ['VP', 'VP', 'NP+AdverbPhrase', 0.2],
+        ['VP', 'Verb', '', 0.3],
+        ['VP', 'Verb', 'Adjective', 0.1],
+
+        ['VP', 'AuxVP', 'NP', 0.2],
+        ['AuxVP', 'AuxVerb', 'VP', 0.7],
+        ['AuxVP', 'AuxVerb', 'FVerb', 0.3],
+
+        ['NP', 'Article', 'Noun', 0.2],
+        ['NP', 'Adjective', 'Noun', 0.2],
+        ['NP', 'Pronoun', '', 0.2],
+        ['NP', 'Noun', '', 0.2],
+        ['NP', 'Name', '', 0.2],
+
+        ['NP+AdverbPhrase', 'AdverbPhrase', 'NP', 0.4],
+        ['NP+AdverbPhrase', 'NP', 'AdverbPhrase', 0.4],
+
+        ['NP+AdverbPhrase', 'AdverbPhrase', 'NP+AdverbPhrase', 0.2],
+
+        ['AdverbPhrase', 'Preposition', 'NP', 0.2],
+        ['AdverbPhrase', 'Preposition', 'Name', 0.2],
+        ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.2],
+        ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.2],
+
+        ['AdverbPhrase', 'Adverb', '', 0.2],
+        ['AdverbPhrase', 'Adverb', 'VP', 0.2],
+        ['AdverbPhrase', 'Adverb', 'Verb', 0.2],
+        ['AdverbPhrase', 'Preposition', 'Adverb', 0.2],
+    ],
+    'lexicon' : [
+        ['WQuestion', 'what', 0.2],
+        ['WQuestion', 'when', 0.2],
+        ['WQuestion', 'where', 0.2],
+        ['WQuestion', 'which', 0.1],
+        ['WQuestion', 'will', 0.1],
+        ['WQuestion', 'could', 0.1],
+        ['WQuestion', 'should', 0.1],
+        ['WQuestion', 'how', 0.1],
+
+        ['Verb', 'is', 0.2],
+        ['Verb', 'be', 0.2],
+        ['Verb', 'go', 0.4],
+
+        # activities
+        ['Verb', 'surf', 0.02],
+        ['Verb', 'ski', 0.02],
+        ['Verb', 'sled', 0.02],
+        ['Verb', 'snowboard', 0.02],
+        ['Verb', 'kayak', 0.02],
+        ['Verb', 'fish', 0.02],
+        ['Verb', 'dive', 0.02],
+        ['Verb', 'golf', 0.02],
+        ['Verb', 'sail', 0.02],
+        ['Verb', 'skydive', 0.02],
+        ['Verb', 'hike', 0.02],
+
+
+        ['Adverb', 'now', 0.3],
+        ['Adverb', 'today', 0.3],
+        ['Adverb', 'tomorrow', 0.3],
+        ['Adverb', 'scuba', 0.1],
+
+        ['Pronoun', 'I', 0.8],
+        ['Pronoun', 'we', 0.2],
+        ['Noun', 'man', 0.1],
+        ['Noun', 'temperature', 0.1],
+        ['Noun', 'weather', 0.2],
+
+        # activities
+        ['Noun', 'surfing', 0.04],
+        ['Noun', 'skiing', 0.04],
+        ['Noun', 'sledding', 0.04],
+        ['Noun', 'snowboarding', 0.04],
+        ['Noun', 'kayaking', 0.04],
+        ['Noun', 'fishing', 0.04],
+        ['Noun', 'diving', 0.04],
+        ['Noun', 'golfing', 0.04],
+        ['Noun', 'sailing', 0.04],
+        ['Noun', 'skydiving', 0.04],
+        ['Noun', 'hiking', 0.04],
+
+        ['Article', 'the', 0.7],
+        ['Article', 'a', 0.3],
+        ['Adjective', 'my', 0.5],
+        ['Adjective', 'scuba', 0.1],
+
+        ['Preposition', 'with', 0.33],
+        ['Preposition', 'in', 0.33],
+        ['Preposition', 'than', 0.33],
+        ['Adjective', 'hotter', 0.1],
+        ['Adjective', 'colder', 0.1],
+        ['Adjective', 'warmer', 0.1],
+        ['Adjective', 'cooler', 0.1],
+    ]
+}
+
 def printV(*args):
     if verbose:
         print(*args)
@@ -83,115 +190,14 @@ def getGrammarSyntaxRules(grammar):
 # What is the temperature in Irvine tomorrow?
 #
 def getGrammarWeather():
-    return {
-        'syntax' : [
-            ['S', 'Greeting', 'S', 0.1],
-            ['S', 'NP', 'VP', 0.3],
-            ['S', 'WQuestion', 'VP', 0.2],
-
-            # new rules
-            ['S', 'WQuestion', 'S', 0.1],
-            ['S', 'AdverbPhrase', 'VP', 0.1],
-            ['S', 'S', 'AdverbPhrase', 0.2],
-            # end
-
-            ['VP', 'Verb', 'Name', 0.1],
-
-            # new rules
-            ['VP', 'VP', 'NP', 0.3],
-            ['VP', 'VP', 'NP+AdverbPhrase', 0.2],
-            ['VP', 'Verb', '', 0.3],
-            ['VP', 'Verb', 'Adjective', 0.1],
-            # end
-
-            ['NP', 'Article', 'Noun', 0.2],
-            ['NP', 'Adjective', 'Noun', 0.2],
-
-            # new rules
-            ['NP', 'Pronoun', '', 0.2],
-            ['NP', 'Noun', '', 0.2],
-            ['NP', 'Name', '', 0.2],
-            # end
-
-            ['NP+AdverbPhrase', 'AdverbPhrase', 'NP', 0.4],
-            ['NP+AdverbPhrase', 'NP', 'AdverbPhrase', 0.4],
-
-            # new rule
-            ['NP+AdverbPhrase', 'AdverbPhrase', 'NP+AdverbPhrase', 0.2],
-
-            ['AdverbPhrase', 'Preposition', 'NP', 0.2],
-            ['AdverbPhrase', 'Preposition', 'Name', 0.2],
-            ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.2],
-            ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.2],
-
-            # new rules
-            ['AdverbPhrase', 'Adverb', '', 0.2],
-            ['AdverbPhrase', 'Adverb', 'VP', 0.2],
-            ['AdverbPhrase', 'Preposition', 'Adverb', 0.2],
-            # end
-        ],
-        'lexicon' : [
-            ['Greeting', 'hi', 0.5],
-            ['Greeting', 'hello', 0.5],
-            ['WQuestion', 'what', 0.5],
-            ['WQuestion', 'when', 0.2],
-            ['WQuestion', 'which', 0.2],
-            ['WQuestion', 'will', 0.2],
-            ['Verb', 'am', 0.3],
-            ['Verb', 'is', 0.3],
-            ['Name', 'Peter', 0.2],
-            ['Name', 'Sue', 0.2],
-            ['Name', 'Irvine', 0.2],
-            ['Pronoun', 'I', 1.0],
-            ['Noun', 'man', 0.2],
-            ['Noun', 'name', 0.2],
-            ['Noun', 'temperature', 0.6],
-            ['Article', 'the', 0.7],
-            ['Article', 'a', 0.3],
-            ['Adjective', 'my', 0.5],
-            ['Adverb', 'now', 0.25],
-            ['Adverb', 'today', 0.25],
-            ['Adverb', 'tomorrow', 0.25],
-            ['Preposition', 'with', 0.33],
-            ['Preposition', 'in', 0.33],
-
-            # step 5.1
-            ['Verb', 'was', 0.2],
-            ['Adverb', 'yesterday', 0.25],
-            ['Name', 'Tustin', 0.2],
-            ['Name', 'Pasadena', 0.2],
-
-            # step 5.2
-            ['Verb', 'be', 0.2],
-            ['Preposition', 'than', 0.33],
-            ['Adjective', 'hotter', 0.25],
-            ['Adjective', 'colder', 0.25],
-         ]
-    }
+    return weatherGrammar
 
 # Unit testing code
 if __name__ == '__main__':
     verbose = True
-    # CYKParse(['the', 'wumpus', 'is', 'dead'], getGrammarE0())
-    #CYKParse(['the', 'old', 'man', 'the', 'boat'], getGrammarGardenPath())
-    #CYKParse(['I', 'saw', 'a', 'man', 'with', 'my', 'telescope'], getGrammarTelescope())
-    # CYKParse(['my', 'name', 'is', 'Peter'], getGrammarWeather())
-    # CYKParse(['hi', 'I', 'am', 'Peter'], getGrammarWeather())
-    # CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine'], getGrammarWeather())
-    # CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'now'], getGrammarWeather())
-    # CYKParse(['what', 'is', 'the', 'temperature', 'now', 'in', 'Irvine'], getGrammarWeather())
-    # CYKParse(['what', 'is', 'now', 'the', 'temperature', 'in', 'Irvine'], getGrammarWeather())
-    # CYKParse(['I', 'am', 'Peter'], getGrammarWeather())
 
-    # step 5 testing
-    # CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'yesterday'], getGrammarWeather())
-    # CYKParse(['what', 'was', 'now', 'the', 'temperature', 'in', 'Irvine'], getGrammarWeather())
-    # CYKParse(['what', 'was', 'the', 'temperature', 'in', 'Irvine', 'now'], getGrammarWeather())
-    # CYKParse(['what', 'was', 'the', 'temperature', 'in', 'Irvine', 'yesterday'], getGrammarWeather())
-    # CYKParse(['what', 'was', 'the', 'temperature', 'in', 'Irvine', 'tomorrow'], getGrammarWeather())
-    # CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'tomorrow'], getGrammarWeather())
-
-    CYKParse("will tomorrow be hotter than today in Irvine".split(), getGrammarWeather())
+    # CYKParse("should I scuba dive".split(), getGrammarWeather())
+    CYKParse("should I go scuba diving".split(), getGrammarWeather())
 
 
 
