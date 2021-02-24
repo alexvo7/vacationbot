@@ -2,6 +2,16 @@ from CYKParse import VacationParser
 from Weather import OWMWrapper
 
 class VacationBot:
+    HOTSPOTS = {
+        "Los Angeles", "San Francisco", "San Diego", "Santa Monica", "Santa Barbara",
+        "Santa Cruz", "Long Beach", "Sacramento", "Anaheim", "Oakland",
+        "Berkeley", "San Jose"
+    }
+
+    COASTAL_CITIES = {
+        # to be added
+    }
+
     # associates the chatbot with instances of CYKParser and OWMWrapper objects
     def __init__(self, parser, wrapper):
         self.requestInfo = {
@@ -9,7 +19,9 @@ class VacationBot:
             'location': '',
             'time0': '',
             'compare': None,
-            'compareWord': ''
+            'compareWord': '',
+            'activity': '',
+
         }
         self.Parser = parser
         self.Wrapper = wrapper
@@ -137,13 +149,14 @@ class VacationBot:
 if __name__ == "__main__":
     # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     user_in = ""
-    while user_in != "bye":
+    while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
         c = VacationBot(VacationParser(), OWMWrapper())
-        T, P = c.Parser.CYKParse("what is the temperature tomorrow in Irvine".lower().split(), c.Parser.getGrammarWeather())
+        T, P = c.Parser.CYKParse(user_in.lower().split(), c.Parser.getGrammarWeather())
         print(c.sentenceTree)
         c.updateRequestInfo(c.getSentenceParse(T))
         c.reply()
+        print(c.Wrapper)
 
     # # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     # T, P = CYKParse.CYKParse(['hi', 'my', 'name', 'is', 'Peter'], CYKParse.getGrammarWeather())

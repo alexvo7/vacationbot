@@ -44,7 +44,7 @@ class VacationParser:
         'vallejo', 'indio', 'ventura', 'fullerton'}
 
     # Some cities are two words long, so we have to join the prefix and suffix.
-    # Note that not all combinations of prefix+suffix are real cities
+    # Note that not all combinations of prefix+suffix are valid cities
     CITY_PREFIXES = {
         'santa', 'newport', 'west', 'long', 'daly',
         'mission', 'costa', 'elk', 'redwood', 'citrus',
@@ -66,28 +66,34 @@ class VacationParser:
         self.verbose = False
         self.weatherGrammar = {
             'syntax' : [
-                ['S', 'NP', 'VP', 0.3],
+                ['S', 'Farewell', '', 0.05],
+                ['S', 'Farewell', 'S', 0.05],
+                ['S', 'NP', 'VP', 0.2],
                 ['S', 'WQuestion', 'VP', 0.2],
                 ['S', 'WQuestion', 'S', 0.1],
                 ['S', 'AdverbPhrase', 'VP', 0.1],
                 ['S', 'S', 'PrepPhrase', 0.1],
-                ['S', 'Noun', 'Verb', 0.1],
-                ['S', 'Pronoun', 'Verb', 0.1],
+                ['S', 'Noun', 'Verb', 0.05],
+                ['S', 'Pronoun', 'Verb', 0.05],
 
-                ['VP', 'Verb', 'Noun', 0.1],
                 ['VP', 'VP', 'NP', 0.2],
-                ['VP', 'VP', 'NP+AdverbPhrase', 0.1],
-                ['VP', 'Verb', '', 0.3],
+                ['VP', 'VP', 'NP+AdverbPhrase', 0.05],
+                ['VP', 'VP', 'AdverbPhrase', 0.05],
+                ['VP', 'VP', 'Adverb', 0.05],
+                ['VP', 'Verb', 'Noun', 0.1],
+                ['VP', 'Verb', 'VP', 0.1],
+                ['VP', 'Verb', '', 0.2],
                 ['VP', 'Verb', 'Adjective', 0.1],
-
-                ['VP', 'AuxVP', 'NP', 0.2],
-                ['AuxVP', 'AuxVerb', 'VP', 0.7],
-                ['AuxVP', 'AuxVerb', 'Verb', 0.3],
+                ['VP', 'AuxVerb', 'VP', 0.07],
+                ['VP', 'AuxVerb', 'Verb', 0.03],
+                ['VP', 'Adverb', 'VP', 0.1],
+                ['VP', 'Adverb', 'Verb', 0.1],
 
                 ['NP', 'Article', 'Noun', 0.1],
                 ['NP', 'Adjective', 'Noun', 0.2],
                 ['NP', 'Pronoun', '', 0.1],
                 ['NP', 'Noun', '', 0.2],
+                ['NP', 'Det', 'Noun', 0.1],
                 ['NP', 'Name', '', 0.2],
                 ['NP', 'CityName', '', 0.2],
                 ['CityName', 'CityPrefix', 'CitySuffix', 1.0],
@@ -96,35 +102,38 @@ class VacationParser:
                 ['NP+AdverbPhrase', 'NP', 'AdverbPhrase', 0.4],
                 ['NP+AdverbPhrase', 'AdverbPhrase', 'NP+AdverbPhrase', 0.2],
 
-                ['PrepPhrase', 'Preposition', 'NP', 0.1],
+                ['PrepPhrase', 'PrepPhrase', 'NP', 0.1],
                 ['PrepPhrase', 'Preposition', 'Name', 0.2],
                 ['PrepPhrase', 'Preposition', 'CityName', 0.2],
-                ['PrepPhrase', 'Preposition', 'Adverb', 0.1],
                 ['PrepPhrase', 'Preposition', 'Noun', 0.05],
+                ['PrepPhrase', 'Preposition', '', 0.1],
 
-                ['AdverbPhrase', 'Preposition', 'Adverb', 0.1],
-                ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.05],
-                ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.05],
-                ['AdverbPhrase', 'Adverb', '', 0.05],
-                ['AdverbPhrase', 'Adverb', 'VP', 0.1],
-                ['AdverbPhrase', 'Adverb', 'Verb', 0.1],
+                ['AdverbPhrase', 'PrepPhrase', 'Adverb', 0.3],
+                ['AdverbPhrase', 'Adverb', 'PrepPhrase', 0.3],
+                ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.1],
+                ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.1],
+                ['AdverbPhrase', 'Adverb', '', 0.2],
 
             ],
             'lexicon' : [
                 ['WQuestion', 'what', 0.1],
                 ['WQuestion', 'when', 0.2],
                 ['WQuestion', 'where', 0.2],
-                ['WQuestion', 'which', 0.05],
-                ['WQuestion', 'will', 0.1],
+                ['WQuestion', 'which', 0.09],
+                ['WQuestion', 'will', 0.01],
                 ['WQuestion', 'could', 0.05],
                 ['WQuestion', 'should', 0.1],
                 ['WQuestion', 'how', 0.1],
                 ['WQuestion', 'is', 0.1],
 
+                ['AuxVerb', 'will', 0.5],
+                ['AuxVerb', 'to', 0.5],
+
                 ['Verb', 'is', 0.2],
-                ['Verb', 'be', 0.2],
+                ['Verb', 'be', 0.1],
                 ['Verb', 'go', 0.3],
                 ['Verb', 'do', 0.1],
+                ['Verb', 'want', 0.1],
 
                 # activities
                 ['Verb', 'surf', 0.02],
@@ -139,16 +148,20 @@ class VacationParser:
                 ['Verb', 'skydive', 0.02],
                 ['Verb', 'hike', 0.02],
 
-                ['Adverb', 'now', 0.3],
-                ['Adverb', 'today', 0.3],
+                ['Adverb', 'now', 0.15],
+                ['Adverb', 'today', 0.15],
                 ['Adverb', 'tomorrow', 0.3],
                 ['Adverb', 'scuba', 0.1],
 
-                ['Pronoun', 'I', 0.8],
+                ['Pronoun', 'I', 0.6],
                 ['Pronoun', 'we', 0.2],
+                ['Pronoun', 'it', 0.2],
                 ['Noun', 'temperature', 0.2],
-                ['Noun', 'weather', 0.4],
+                ['Noun', 'weather', 0.3],
                 ['Noun', 'activity', 0.1],
+                ['Noun', 'today', 0.05],
+                ['Noun', 'tomorrow', 0.05],
+                ['Noun', 'week', 0.1],
 
                 # activities
                 ['Noun', 'surfing', 0.01],
@@ -162,19 +175,30 @@ class VacationParser:
                 ['Noun', 'sailing', 0.01],
                 ['Noun', 'skydiving', 0.01],
                 ['Noun', 'hiking', 0.01],
+                ['Det', 'next', 1.0],
 
+                ['Preposition', 'with', 0.25],
+                ['Preposition', 'in', 0.25],
+                ['Preposition', 'than', 0.25],
                 ['Article', 'the', 0.7],
                 ['Article', 'a', 0.3],
-                ['Adjective', 'my', 0.5],
+                ['Adjective', 'my', 0.2],
                 ['Adjective', 'scuba', 0.1],
-
-                ['Preposition', 'with', 0.33],
-                ['Preposition', 'in', 0.33],
-                ['Preposition', 'than', 0.33],
                 ['Adjective', 'hotter', 0.1],
                 ['Adjective', 'colder', 0.1],
                 ['Adjective', 'warmer', 0.1],
                 ['Adjective', 'cooler', 0.1],
+
+                # weather adjectives
+                ['Adjective', 'sunny', 0.1],
+                ['Adjective', 'rainy', 0.1],
+                ['Adjective', 'cloudy', 0.1],
+                ['Adjective', 'clear', 0.1],
+                ['Adjective', 'snowy', 0.1],
+
+                ['Farewell', 'goodbye', 0.33],
+                ['Farewell', 'bye', 0.33],
+                ['Farewell', 'bye-bye', 0.33],
             ]
         }
 
@@ -254,7 +278,6 @@ class VacationParser:
     # These two getXXX functions use yield instead of return so that a single pair can be sent back,
     # and since that pair is a tuple, Python permits a friendly 'X, p' syntax
     # in the calling routine.
-    # Project 3 update: modified to
 
     def getGrammarLexicalRules(self, grammar, word):
         for rule in grammar['lexicon']:
@@ -285,7 +308,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("should i surf in irvine".split(), c.getGrammarWeather())
+    c.CYKParse("i want to scuba dive tomorrow in irvine".split(), c.getGrammarWeather())
 
 
 
