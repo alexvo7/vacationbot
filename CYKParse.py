@@ -3,20 +3,80 @@
 import Tree
 
 class VacationParser:
+    # hardcoded list of top 100 cities in California (from Wikipedia)
+    # CITY_NAMES = {
+    #     "los angeles", "san diego", "san jose", "san francisco", "fresno",
+    #     "sacramento", "long beach", "oakland", "bakersfield", "anaheim",
+    #     "santa ana", "riverside", "stockton", "irvine", "chula vista",
+    #     "fremont", "san bernardino", "modesto", "fontana", "moreno valley",
+    #     "santa clarita", "oxnard", "glendale", "huntington beach", "ontario",
+    #     "rancho cucamonga", "santa rosa", "oceanside", "elk grove", "garden grove",
+    #     "corona", "hayward", "lancaster", "salinas", "palmdale",
+    #     "sunnyvale", "pomona", "escondido", "torrance", "roseville",
+    #     "pasadena", "orange", "fullerton", "visalia", "santa clara",
+    #     "concord", "thousand oaks", "simi valley", "victorville", "vallejo",
+    #     "berkeley", "fairfield", "murrieta", "el monte", "carlsbad",
+    #     "temecula", "clovis", "costa mesa", "antioch", "downey",
+    #     "richmond", "jurupa valley", "ventura", "inglewood", "santa maria",
+    #     "daly city", "west covina", "san mateo", "norwalk", "rialto",
+    #     "chico", "el cajon", "burbank", "vista", "vacaville",
+    #     "san marcos", "hesperia", "compton", "menifee", "tracy",
+    #     "mission viejo", "chino", "south gate", "redding", "indio",
+    #     "carson", "santa barbara", "westminster", "santa monica", "livermore",
+    #     "san leandro", "citrus heights", "hawthorne", "redwood city", "lake forest",
+    #     "hemet", "whittier", "newport beach", "milpitas", "chino hills"
+    # }
+
+    # City names that are one word long
+    CITY_NAMES = {
+        'hesperia', 'rialto', 'escondido', 'ontario', 'riverside',
+        'berkeley', 'fontana', 'richmond', 'clovis', 'inglewood',
+        'glendale', 'burbank', 'victorville', 'compton', 'redding',
+        'irvine', 'oxnard', 'sunnyvale', 'corona', 'chino',
+        'westminster', 'oceanside', 'milpitas', 'vista', 'concord',
+        'hemet', 'oakland', 'downey', 'palmdale', 'pomona',
+        'orange', 'carson', 'visalia', 'fresno', 'chico',
+        'fremont', 'menifee', 'bakersfield', 'antioch', 'whittier',
+        'modesto', 'carlsbad', 'livermore', 'vacaville', 'pasadena',
+        'murrieta', 'roseville', 'anaheim', 'temecula', 'stockton',
+        'norwalk', 'sacramento', 'hayward', 'salinas', 'lancaster',
+        'torrance', 'hawthorne', 'tracy', 'fairfield',
+        'vallejo', 'indio', 'ventura', 'fullerton'}
+
+    # Some cities are two words long, so we have to join the prefix and suffix.
+    # Note that not all combinations of prefix+suffix are real cities
+    CITY_PREFIXES = {
+        'santa', 'newport', 'west', 'long', 'daly',
+        'mission', 'costa', 'elk', 'redwood', 'citrus',
+        'rancho', 'lake', 'chula', 'simi', 'jurupa',
+        'moreno', 'thousand', 'huntington', 'south',
+        'san', 'garden', 'los', 'chino', 'el'
+    }
+
+    CITY_SUFFIXES = {
+        'bernardino', 'beach', 'covina', 'mesa', 'forest',
+        'city', 'clara', 'jose', 'marcos', 'clarita',
+        'viejo', 'francisco', 'cucamonga', 'rosa', 'mateo',
+        'leandro', 'ana', 'diego', 'monte', 'vista', 'maria',
+        'hills', 'valley', 'cajon', 'angeles', 'grove',
+        'oaks', 'gate', 'heights', 'barbara', 'monica'
+    }
+
     def __init__(self):
         self.verbose = False
         self.weatherGrammar = {
             'syntax' : [
                 ['S', 'NP', 'VP', 0.3],
                 ['S', 'WQuestion', 'VP', 0.2],
-
                 ['S', 'WQuestion', 'S', 0.1],
                 ['S', 'AdverbPhrase', 'VP', 0.1],
-                ['S', 'S', 'AdverbPhrase', 0.2],
+                ['S', 'S', 'PrepPhrase', 0.1],
+                ['S', 'Noun', 'Verb', 0.1],
+                ['S', 'Pronoun', 'Verb', 0.1],
 
                 ['VP', 'Verb', 'Noun', 0.1],
                 ['VP', 'VP', 'NP', 0.2],
-                ['VP', 'VP', 'NP+AdverbPhrase', 0.2],
+                ['VP', 'VP', 'NP+AdverbPhrase', 0.1],
                 ['VP', 'Verb', '', 0.3],
                 ['VP', 'Verb', 'Adjective', 0.1],
 
@@ -24,40 +84,47 @@ class VacationParser:
                 ['AuxVP', 'AuxVerb', 'VP', 0.7],
                 ['AuxVP', 'AuxVerb', 'Verb', 0.3],
 
-                ['NP', 'Article', 'Noun', 0.2],
+                ['NP', 'Article', 'Noun', 0.1],
                 ['NP', 'Adjective', 'Noun', 0.2],
-                ['NP', 'Pronoun', '', 0.2],
+                ['NP', 'Pronoun', '', 0.1],
                 ['NP', 'Noun', '', 0.2],
                 ['NP', 'Name', '', 0.2],
+                ['NP', 'CityName', '', 0.2],
+                ['CityName', 'CityPrefix', 'CitySuffix', 1.0],
 
                 ['NP+AdverbPhrase', 'AdverbPhrase', 'NP', 0.4],
                 ['NP+AdverbPhrase', 'NP', 'AdverbPhrase', 0.4],
-
                 ['NP+AdverbPhrase', 'AdverbPhrase', 'NP+AdverbPhrase', 0.2],
 
-                ['AdverbPhrase', 'Preposition', 'NP', 0.2],
-                ['AdverbPhrase', 'Preposition', 'Noun', 0.1],
-                ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.2],
-                ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.2],
+                ['PrepPhrase', 'Preposition', 'NP', 0.1],
+                ['PrepPhrase', 'Preposition', 'Name', 0.2],
+                ['PrepPhrase', 'Preposition', 'CityName', 0.2],
+                ['PrepPhrase', 'Preposition', 'Adverb', 0.1],
+                ['PrepPhrase', 'Preposition', 'Noun', 0.05],
 
-                ['AdverbPhrase', 'Adverb', '', 0.2],
-                ['AdverbPhrase', 'Adverb', 'VP', 0.2],
-                ['AdverbPhrase', 'Adverb', 'Verb', 0.1],
                 ['AdverbPhrase', 'Preposition', 'Adverb', 0.1],
+                ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.05],
+                ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.05],
+                ['AdverbPhrase', 'Adverb', '', 0.05],
+                ['AdverbPhrase', 'Adverb', 'VP', 0.1],
+                ['AdverbPhrase', 'Adverb', 'Verb', 0.1],
+
             ],
             'lexicon' : [
-                ['WQuestion', 'what', 0.2],
+                ['WQuestion', 'what', 0.1],
                 ['WQuestion', 'when', 0.2],
                 ['WQuestion', 'where', 0.2],
-                ['WQuestion', 'which', 0.1],
+                ['WQuestion', 'which', 0.05],
                 ['WQuestion', 'will', 0.1],
-                ['WQuestion', 'could', 0.1],
+                ['WQuestion', 'could', 0.05],
                 ['WQuestion', 'should', 0.1],
                 ['WQuestion', 'how', 0.1],
+                ['WQuestion', 'is', 0.1],
 
                 ['Verb', 'is', 0.2],
                 ['Verb', 'be', 0.2],
-                ['Verb', 'go', 0.4],
+                ['Verb', 'go', 0.3],
+                ['Verb', 'do', 0.1],
 
                 # activities
                 ['Verb', 'surf', 0.02],
@@ -79,10 +146,9 @@ class VacationParser:
 
                 ['Pronoun', 'I', 0.8],
                 ['Pronoun', 'we', 0.2],
-                ['Noun', 'man', 0.1],
-                ['Noun', 'temperature', 0.1],
-                ['Noun', 'weather', 0.2],
-                ['Noun', 'Irvine', 0.2],
+                ['Noun', 'temperature', 0.2],
+                ['Noun', 'weather', 0.4],
+                ['Noun', 'activity', 0.1],
 
                 # activities
                 ['Noun', 'surfing', 0.01],
@@ -112,6 +178,14 @@ class VacationParser:
             ]
         }
 
+        # adding cities to lexicon
+        for city in self.CITY_NAMES:
+            self.addLexicon(city, "Name")
+        for i in self.CITY_PREFIXES:
+            self.addLexicon(i, "CityPrefix")
+        for j in self.CITY_SUFFIXES:
+            self.addLexicon(j, "CitySuffix")
+
     def printV(self, *args):
         if self.verbose:
             print(*args)
@@ -135,6 +209,8 @@ class VacationParser:
                 T[X + '/' + str(i) + '/' + str(i)] = Tree.Tree(X, None, None, lexiconItem=words[i])
         self.printV('P:', P)
         self.printV('T:', [str(t)+':'+str(T[t]) for t in T])
+        for i in self.getGrammarWeather()["lexicon"]:
+            print(i)
         # Construct X_i:j from Y_i:j + Z_j+i:k, shortest spans first
         for i, j, k in self.subspans(len(words)):
             for X, Y, Z, p in self.getGrammarSyntaxRules(grammar):
@@ -178,6 +254,8 @@ class VacationParser:
     # These two getXXX functions use yield instead of return so that a single pair can be sent back,
     # and since that pair is a tuple, Python permits a friendly 'X, p' syntax
     # in the calling routine.
+    # Project 3 update: modified to
+
     def getGrammarLexicalRules(self, grammar, word):
         for rule in grammar['lexicon']:
             if rule[1].lower() == word.lower():
@@ -194,11 +272,11 @@ class VacationParser:
     def setVerbose(self, val: bool):
         self.verbose = val
 
-    # There is space for about 300 cities, and a probability of 0.3 is divided among them.
+    # There is space for 100 cities, so each city is assigned a probability of 0.01.
     # All cities are in California only
-    def addLexicon(self, city):
+    def addLexicon(self, city, pos):
         self.weatherGrammar["lexicon"].append(
-            ["Noun", city, 0.3 / 300]
+            [pos, city, 0.01]
         )
 
 
@@ -207,7 +285,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("SHOULD I GO SCUBA DIVING".split(), c.getGrammarWeather())
+    c.CYKParse("should i surf in irvine".split(), c.getGrammarWeather())
 
 
 

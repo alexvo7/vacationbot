@@ -1,9 +1,9 @@
 from CYKParse import VacationParser
-from Weather import OWMQuery
+from Weather import OWMWrapper
 
 class VacationBot:
-    # associates the chatbot with instances of CYKParser and OWMQuery objects
-    def __init__(self, parser, query):
+    # associates the chatbot with instances of CYKParser and OWMWrapper objects
+    def __init__(self, parser, wrapper):
         self.requestInfo = {
             'time': 'now',
             'location': '',
@@ -12,7 +12,7 @@ class VacationBot:
             'compareWord': ''
         }
         self.Parser = parser
-        self.Query = query
+        self.Wrapper = wrapper
         self.sentenceTree = None
         self.comparing = False
         self.lookingForLocation = False
@@ -81,7 +81,7 @@ class VacationBot:
 
             # print(leaf, 'comparing=', self.comparing, 'loc=', self.lookingForLocation)
 
-    # uses the OWMQuery object to get weather if it doesn't exist in local DB already
+    # uses the OWMWrapper object to get weather if it doesn't exist in local DB already
     def getTemperature(self, location, time):
         if location.lower() == 'irvine':
             if time == 'now' or time == 'today':
@@ -133,160 +133,14 @@ class VacationBot:
         print('the temperature in ' + self.requestInfo['location'] + ' ' + self.requestInfo['time'] +
               ' is ' + self.getTemperature(self.requestInfo['location'], self.requestInfo['time']) + '.')
 
-# requestInfo = {
-#         'time': '',
-#         'location': '',
-#         'time0': '',
-#         'compare': None,
-#         'compareWord': ''
-# }
-# haveGreeted = False
-# comparing = False
-#
-# # Given the collection of parse trees returned by CYKParse, this function
-# # returns the one corresponding to the complete sentence.
-# def getSentenceParse(T):
-#     sentenceTrees = { k: v for k,v in T.items() if k.startswith('S/0') }
-#     completeSentenceTree = max(sentenceTrees.keys())
-#     # print('getSentenceParse', completeSentenceTree)
-#     return T[completeSentenceTree]
-#
-# # Processes the leaves of the parse tree to pull out the user's request.
-# def updateRequestInfo(Tr):
-#     global requestInfo
-#     global comparing
-#     lookingForLocation = False
-#     lookingForName = False
-#     time0 = ''
-#
-#     for leaf in Tr.getLeaves():
-#         # get temperature in one location
-#         if leaf[0] == 'Adverb':
-#             requestInfo['time'] = leaf[1]
-#         if lookingForLocation and leaf[0] == 'Name':
-#             requestInfo['location'] = leaf[1]
-#         if leaf[0] == 'Preposition' and leaf[1] == 'in':
-#             lookingForLocation = True
-#         else:
-#             lookingForLocation = False
-#
-#         """
-#         'Will' will compare two temps from two different times.
-#         First it gets the first time and save it, then we store the second time in requestInfo,
-#         then it gets the location and compare the two temperatures from the times.
-#         """
-#         if leaf[0] == 'WQuestion' and leaf[1] == 'will':
-#             comparing = True
-#             requestInfo['time'] = ''
-#             requestInfo['time0'] = ''
-#             requestInfo['location'] = ''
-#         if comparing:
-#             if not (requestInfo['time'] and requestInfo['location']):
-#                 if leaf[0] == 'Adjective':
-#                     requestInfo['compareWord'] = leaf[1]
-#                 if leaf[0] == 'Adverb' and time0 == '':
-#                     time0 = leaf[1]
-#                 elif leaf[0] == 'Adverb' and time0:
-#                     requestInfo['time'] = leaf[1]
-#                 if lookingForLocation and leaf[0] == 'Name':
-#                     requestInfo['location'] = leaf[1]
-#             else:
-#                 # compare the two temperatures here
-#                 requestInfo['time0'] = time0
-#                 # print(requestInfo['location'],
-#                 #         requestInfo['time0'], getTemperature(requestInfo['location'], requestInfo['time0']),
-#                 #         requestInfo['time'], getTemperature(requestInfo['location'], requestInfo['time']))
-#
-#                 if requestInfo['compareWord'] == 'hotter':
-#                     requestInfo['compare'] = getTemperature(requestInfo['location'], requestInfo['time']) \
-#                                             < getTemperature(requestInfo['location'], requestInfo['time0'])
-#                 elif requestInfo['compareWord'] == 'colder':
-#                     requestInfo['compare'] = getTemperature(requestInfo['location'], requestInfo['time']) \
-#                                              > getTemperature(requestInfo['location'], requestInfo['time0'])
-#         else:
-#             comparing = False
-#
-#
-#         # get name section
-#         if leaf[0] == 'Noun' and leaf[1] == 'name' or leaf[0] == 'Pronoun' and leaf[1] == 'I':
-#             lookingForName = True
-#         if lookingForName and leaf[0] == 'Name':
-#             requestInfo['name'] = leaf[1]
-#
-#         # print(leaf, 'comparing=', comparing, 'loc=', lookingForLocation, 'name=', lookingForName)
-#
-#
-# # This function contains the data known by our simple chatbot
-# def getTemperature(location, time):
-#     if location == 'Irvine':
-#         if time == 'now' or time == 'today':
-#             return '68'
-#         elif time == 'yesterday':
-#             return '69'
-#         elif time == 'tomorrow':
-#             return '70'
-#         else:
-#             return 'unknown'
-#     elif location == 'Tustin':
-#         if time == 'now' or time == 'today':
-#             return '58'
-#         elif time == 'yesterday':
-#             return '59'
-#         elif time == 'tomorrow':
-#             return '60'
-#         else:
-#             return 'unknown'
-#     elif location == 'Pasadena':
-#         if time == 'now' or time == 'today':
-#             return '78'
-#         elif time == 'yesterday':
-#             return '79'
-#         elif time == 'tomorrow':
-#             return '80'
-#         else:
-#             return 'unknown'
-#
-#     else:
-#         return 'unknown'
-#
-# # Format a reply to the user, based on what the user wrote.
-# def reply():
-#     global requestInfo
-#     global haveGreeted
-#     global comparing
-#     if not haveGreeted and requestInfo['name'] != '':
-#         print("Hello", requestInfo['name'] + '.')
-#         haveGreeted = True
-#         return
-#
-#     if comparing and requestInfo['compare'] is not None:
-#         if requestInfo['compare']:
-#             print("Yes,", requestInfo['time0'], 'is', requestInfo['compareWord'], 'than',
-#                   requestInfo['time'], 'in', requestInfo['location'] + '. ', end='')
-#         else:
-#             print("No,", requestInfo['time0'], 'is not', requestInfo['compareWord'], 'than',
-#                   requestInfo['time'], 'in', requestInfo['location'] + '. ', end='')
-#         print(requestInfo['time0'], 'is', getTemperature(requestInfo['location'], requestInfo['time0']),
-#               'and', requestInfo['time'], 'is', getTemperature(requestInfo['location'], requestInfo['time']))
-#         return
-#
-#     time = 'now' # the default
-#     if requestInfo['time'] != '':
-#         time = requestInfo['time']
-#     salutation = ''
-#     if requestInfo['name'] != '':
-#         salutation = requestInfo['name'] + ', '
-#     print(salutation + 'the temperature in ' + requestInfo['location'] + ' ' +
-#         time + ' is ' + getTemperature(requestInfo['location'], time) + '.')
-
 
 if __name__ == "__main__":
     # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     user_in = ""
-    while user_in != "exit":
+    while user_in != "bye":
         user_in = input("User>")
-        c = VacationBot(VacationParser(), OWMQuery())
-        T, P = c.Parser.CYKParse("what is the temperature tomorrow in Irvine".split(), c.Parser.getGrammarWeather())
+        c = VacationBot(VacationParser(), OWMWrapper())
+        T, P = c.Parser.CYKParse("what is the temperature tomorrow in Irvine".lower().split(), c.Parser.getGrammarWeather())
         print(c.sentenceTree)
         c.updateRequestInfo(c.getSentenceParse(T))
         c.reply()
