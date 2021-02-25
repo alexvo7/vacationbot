@@ -1,5 +1,6 @@
 from CYKParse import VacationParser
 from Weather import OWMWrapper
+import random
 
 class VacationBot:
     HOTSPOTS = {
@@ -9,7 +10,18 @@ class VacationBot:
     }
 
     COASTAL_CITIES = {
-        # to be added
+        # to be added in part 4
+    }
+
+    ACTIVITIES = {
+        "surf", "ski", "sail", "sled", "snowboard",
+        "kayak", "fish", "dive", "golf", "hike", "skydive",
+        "surfing", "skiing", "sailing", "sledding", "snowboarding",
+        "kayaking", "fishing", "diving", "golfing", "hiking", "skydiving"
+    }
+
+    WEATHER_KEYWORDS = {
+        "rainy", "cloudy", "sunny", "snowy", "clear"
     }
 
     # associates the chatbot with instances of CYKParser and OWMWrapper objects
@@ -17,18 +29,27 @@ class VacationBot:
         self.requestInfo = {
             'time': 'now',
             'location': '',
+            'locPrefix': '',
+            'locSuffix': '',
             'time0': '',
-            'compare': None,
-            'compareWord': '',
+            'compare': None,    # bool result of comparison
+            'compareWord': '',  # hotter/warmer/colder/cooler
             'activity': '',
 
         }
+
         self.Parser = parser
         self.Wrapper = wrapper
         self.sentenceTree = None
+
+        # chatbot state flags
         self.comparing = False
-        self.lookingForLocation = False
-        self.lookingForName = False
+        self.hasLocation = False
+        self.hasActivity = False
+        self.hasTime = False
+        self.needsRec = False
+        self.question = False
+        self.weatherQuery = False
 
     # Given the collection of parse trees returned by CYKParse, this function
     # returns the one corresponding to the complete sentence.
@@ -40,123 +61,171 @@ class VacationBot:
         return self.sentenceTree
 
     # Processes the leaves of the parse tree to pull out the user's request.
-    def updateRequestInfo(self, Tr):
-        self.lookingForLocation = False
-        self.lookingForName = False
-        time0 = ''
+    def updateRequestInfo(self):
+        self.comparing = False
+        self.hasLocation = False
+        self.hasActivity = False
+        self.hasTime = False
+        self.needsRec = False
+        self.question = False
+        self.weatherQuery = False
+        self.requestInfo["compare"] = None
+        self.requestInfo["time0"] = ""
 
-        for leaf in Tr.getLeaves():
-            # get temperature in one location
-            if leaf[0] == 'Adverb':
+        for leaf in self.sentenceTree.getLeaves():
+            if leaf[1] in self.ACTIVITIES:
+                self.requestInfo["activity"] = leaf[1]
+                self.hasActivity = True
+
+            if leaf[0] == "WQuestion":
+                self.question = True
+
+            if leaf[0] == 'Adverb' and not self.hasTime:
                 self.requestInfo['time'] = leaf[1]
-            if self.lookingForLocation and leaf[0] == 'Name':
-                self.requestInfo['location'] = leaf[1]
-            self.lookingForLocation = leaf[0] == 'Preposition' and leaf[1] == 'in'
+                self.hasTime = True
 
-            """
-            'Will' will compare two temps from two different times.
-            First it gets the first time and save it, then we store the second time in requestInfo, 
-            then it gets the location and compare the two temperatures from the times.
-            """
-            if leaf[0] == 'WQuestion' and leaf[1] == 'will':
-                self.comparing = True
-                self.requestInfo['time'] = ''
-                self.requestInfo['time0'] = ''
-                self.requestInfo['location'] = ''
-            if self.comparing:
-                if not (self.requestInfo['time'] and self.requestInfo['location']):
-                    if leaf[0] == 'Adjective':
-                        self.requestInfo['compareWord'] = leaf[1]
-                    if leaf[0] == 'Adverb' and time0 == '':
-                        time0 = leaf[1]
-                    elif leaf[0] == 'Adverb' and time0:
-                        self.requestInfo['time'] = leaf[1]
-                    if self.lookingForLocation and leaf[0] == 'Name':
-                        self.requestInfo['location'] = leaf[1]
+            if not self.hasLocation and leaf[0] in ("Name", "CityPrefix", "CitySuffix"):
+                if leaf[0] == "Name":
+                    self.requestInfo["location"] = leaf[1]
+                    self.requestInfo["locPrefix"] = ""
+                    self.requestInfo["locSuffix"] = ""
+                    self.hasLocation = True
                 else:
-                    # compare the two temperatures here
-                    self.requestInfo['time0'] = time0
-                    # print(requestInfo['location'],
-                    #         requestInfo['time0'], getTemperature(requestInfo['location'], requestInfo['time0']),
-                    #         requestInfo['time'], getTemperature(requestInfo['location'], requestInfo['time']))
+                    self.requestInfo["location"] = ""
+                    if leaf[0] == "CityPrefix":
+                        self.requestInfo["locPrefix"] = leaf[1]
+                    else:
+                        self.requestInfo["locSuffix"] = leaf[1]
+                        self.hasLocation = True
 
-                    if self.requestInfo['compareWord'] in ('hotter', 'warmer'):
-                        self.requestInfo['compare'] = \
-                            self.getTemperature(self.requestInfo['location'], self.requestInfo['time']) \
-                            < self.getTemperature(self.requestInfo['location'], self.requestInfo['time0'])
-                    elif self.requestInfo['compareWord'] in ('colder', 'cooler'):
-                        self.requestInfo['compare'] = \
-                            self.getTemperature(self.requestInfo['location'], self.requestInfo['time']) \
-                            > self.getTemperature(self.requestInfo['location'], self.requestInfo['time0'])
-            else:
-                self.comparing = False
+            if self.question:
+                if leaf[1] in self.WEATHER_KEYWORDS or leaf[1] in ("weather", "temperature"):
+                    self.weatherQuery = True
+                if leaf[0] == "Verb" and leaf[1] in ("go", "do") and not self.hasActivity:
+                    self.needsRec = True
 
-            # print(leaf, 'comparing=', self.comparing, 'loc=', self.lookingForLocation)
+            if self.hasActivity and leaf[0] == "Verb" and leaf[1] == "want":
+                self.needsRec = True
 
-    # uses the OWMWrapper object to get weather if it doesn't exist in local DB already
+            if leaf[0] == "Preposition" and leaf[1] == "than":
+                self.comparing = True
+
+            if leaf[0] == "Adjective" and leaf[1] in ("hotter", "warmer", "cooler", "colder"):
+                self.requestInfo["compareWord"] = leaf[1]
+
+            if self.comparing:
+                if not self.requestInfo["time0"] and leaf[1] in ("today", "tomorrow"):
+                    time0 = self.requestInfo["time0"] = leaf[1]
+
+                if self.hasLocation:
+                    time0 = self.requestInfo["time0"]
+                    time = self.requestInfo["time"]
+                    loc = ""
+                    if self.requestInfo["location"]:
+                        loc = self.requestInfo["location"]
+                    elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                        loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+
+                    time0_temp = self.getTemperature(loc, time0)
+                    time_temp = self.getTemperature(loc, time)
+
+                    if (time0_temp != "unknown" and time_temp != "unknown"):
+                        if self.requestInfo['compareWord'] in ('hotter', 'warmer'):
+                            self.requestInfo['compare'] = time_temp > time0_temp
+                        elif self.requestInfo['compareWord'] in ('colder', 'cooler'):
+                            self.requestInfo['compare'] = time_temp < time0_temp
+
+        print(f"updateRequestInfo {self.requestInfo}")
+        print("self.comparing:",self.comparing)
+        print("self.hasLocation:",self.hasLocation)
+        print("self.hasActivity:",self.hasActivity)
+        print("self.hasTime:",self.hasTime)
+        print("self.needsRec:",self.needsRec)
+        print("self.question:",self.question)
+        print("self.weatherQuery:",self.weatherQuery)
+
+    # Uses the OWMWrapper object to get weather if it doesn't exist in local DB already.
+    # Returns "unknown" if location/temp doesn't exist.
+    # We can't handle "week" here since this function only returns one value
+    # Strangely, "this week" and "next week" get the same thing since we can only
+    # get a 7 day forecast anyway.
+    def getCityInfo(self, location, time):
+        location = location.lower()
+        time = time.lower()
+        t = 0
+        if time == "tomorrow":
+            t = 1
+        if time in ("now", "today", "tomorrow"):
+            if not (location in self.Wrapper.DB and t in self.Wrapper.DB[location]):
+                if time == "tomorrow":
+                    self.Wrapper.getWeekly(location)
+                else:
+                    self.Wrapper.get(location)
+
+            temp = self.Wrapper.getCityTemp(location, t)
+            weather = self.Wrapper.getCityWeather(location, t)
+            print(f"getTemperature {temp} {weather}")
+            # getCityTemp returns NaN if couldn't get temperature
+            if temp == temp and weather != "unknown":
+                return (temp, weather)
+        return ("unknown", "unknown")
+
     def getTemperature(self, location, time):
-        if location.lower() == 'irvine':
-            if time == 'now' or time == 'today':
-                return '68'
-            elif time == 'yesterday':
-                return '69'
-            elif time == 'tomorrow':
-                return '70'
-            else:
-                return 'unknown'
-        elif location.lower() == 'tustin':
-            if time == 'now' or time == 'today':
-                return '58'
-            elif time == 'yesterday':
-                return '59'
-            elif time == 'tomorrow':
-                return '60'
-            else:
-                return 'unknown'
-        elif location.lower() == 'pasadena':
-            if time == 'now' or time == 'today':
-                return '78'
-            elif time == 'yesterday':
-                return '79'
-            elif time == 'tomorrow':
-                return '80'
-            else:
-                return 'unknown'
+        return self.getCityInfo(location, time)[0]
 
-        else:
-            return 'unknown'
+    def getWeather(self, location, time):
+        return self.getCityInfo(location, time)[1]
+
+    # gives user input to chatbot
+    def userSay(self, sentence):
+        self.sentenceTree, _ = self.Parser.CYKParse(sentence.lower().split(), self.Parser.getGrammarWeather())
+        self.sentenceTree = self.getSentenceParse(self.sentenceTree)
+        self.updateRequestInfo()
 
     # Format a reply to the user, based on what the user wrote.
     def reply(self):
-        print(self.requestInfo, self.comparing)
-        if self.comparing and self.requestInfo['compare'] is not None:
-            if self.requestInfo['compare']:
-                print("Yes,", self.requestInfo['time0'], 'is', self.requestInfo['compareWord'], 'than',
-                      self.requestInfo['time'], 'in', self.requestInfo['location'] + '. ', end='')
-            else:
-                print("No,", self.requestInfo['time0'], 'is not', self.requestInfo['compareWord'], 'than',
-                      self.requestInfo['time'], 'in', self.requestInfo['location'] + '. ', end='')
-            print(self.requestInfo['time0'], 'is', self.getTemperature(self.requestInfo['location'], self.requestInfo['time0']),
-                  'and', self.requestInfo['time'], 'is', self.getTemperature(self.requestInfo['location'], self.requestInfo['time']))
-            return
+        if self.weatherQuery:
+            if self.requestInfo["location"] or (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]):
+                if self.requestInfo["location"]:
+                    loc = self.requestInfo["location"]
+                elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                    loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+                time = self.requestInfo["time"]
+                temp = self.getTemperature(loc, time)
+                weather = self.getWeather(loc, time)
 
-        if self.requestInfo['time'] != '':
-            time = self.requestInfo['time']
-        print('the temperature in ' + self.requestInfo['location'] + ' ' + self.requestInfo['time'] +
-              ' is ' + self.getTemperature(self.requestInfo['location'], self.requestInfo['time']) + '.')
+                templates = (
+                    f"The weather in {loc} {time} is {weather}, with a temperature of {temp}F.",
+                    f"It's {weather} {time} in {loc}, with a temperature of {temp}F."
+                )
+                print(random.choice(templates))
+
+        elif self.comparing:
+            if self.requestInfo["location"]:
+                loc = self.requestInfo["location"]
+            elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+            time = self.requestInfo["time"]
+            time0 = self.requestInfo["time0"]
+            temp = self.getTemperature(loc, time)
+            temp0 = self.getTemperature(loc, time0)
+            comp = self.requestInfo["compareWord"]
+            if self.requestInfo["compare"]:
+                print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                      f"It is {temp}F {time} and {temp0}F {time0}.")
+            else:
+                print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                      f"It is {temp}F {time} and {temp0}F {time0}.")
 
 
 if __name__ == "__main__":
     # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     user_in = ""
+    c = VacationBot(VacationParser(), OWMWrapper())
     while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
-        c = VacationBot(VacationParser(), OWMWrapper())
-        T, P = c.Parser.CYKParse(user_in.lower().split(), c.Parser.getGrammarWeather())
-        print(c.sentenceTree)
-        c.updateRequestInfo(c.getSentenceParse(T))
+        c.userSay(user_in)
         c.reply()
-        print(c.Wrapper)
 
     # # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     # T, P = CYKParse.CYKParse(['hi', 'my', 'name', 'is', 'Peter'], CYKParse.getGrammarWeather())

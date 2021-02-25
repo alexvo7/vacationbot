@@ -77,17 +77,21 @@ class OWMWrapper:
 
         return status_code
 
-    def getCityTemp(self, city):
+    # gets city temperature for time t, where today = t = 0
+    def getCityTemp(self, city, t=0):
+        assert 0 <= t < 8, f"t was {t}"
         if city.lower() in self.DB:
-            return self.DB[city]["temp"]
-        else:
-            return -1
+            if t in self.DB[city]:
+                return self.DB[city][t]["temp"]
+        return float("NaN")
 
-    def getCityWeather(self, city):
+    # gets city weather for time t, where today = t = 0
+    def getCityWeather(self, city, t=0):
+        assert 0 <= t < 8, f"t was {t}"
         if city.lower() in self.DB:
-            return self.DB[city]["weather"]
-        else:
-            return -1
+            if t in self.DB[city]:
+                return self.DB[city][t]["weather"]
+        return "unknown"
 
     def __str__(self):
         s = "OWMWrapper.DB(\n"
@@ -100,7 +104,10 @@ class OWMWrapper:
 
 if __name__ == "__main__":
     w = OWMWrapper()
+    # get() or getWeekly() cities here
+    w.get("sacramento")
 
+    #
     print(w)
 
 

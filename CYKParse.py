@@ -68,7 +68,9 @@ class VacationParser:
             'syntax' : [
                 ['S', 'Farewell', '', 0.05],
                 ['S', 'Farewell', 'S', 0.05],
-                ['S', 'NP', 'VP', 0.2],
+                ['S', 'NP', 'VP', 0.1],
+                ['S', 'NP', 'Verb', 0.05],
+                ['S', 'Noun', 'VP', 0.05],
                 ['S', 'WQuestion', 'VP', 0.2],
                 ['S', 'WQuestion', 'S', 0.1],
                 ['S', 'AdverbPhrase', 'VP', 0.1],
@@ -126,14 +128,16 @@ class VacationParser:
                 ['WQuestion', 'how', 0.1],
                 ['WQuestion', 'is', 0.1],
 
-                ['AuxVerb', 'will', 0.5],
-                ['AuxVerb', 'to', 0.5],
+                ['AuxVerb', 'will', 0.33],
+                ['AuxVerb', 'to', 0.33],
+                ['AuxVerb', 'be', 0.33],
 
                 ['Verb', 'is', 0.2],
                 ['Verb', 'be', 0.1],
-                ['Verb', 'go', 0.3],
+                ['Verb', 'go', 0.1],
                 ['Verb', 'do', 0.1],
                 ['Verb', 'want', 0.1],
+                ['Verb', 'like', 0.1],
 
                 # activities
                 ['Verb', 'surf', 0.02],
@@ -234,8 +238,6 @@ class VacationParser:
                 T[X + '/' + str(i) + '/' + str(i)] = Tree.Tree(X, None, None, lexiconItem=words[i])
         self.printV('P:', P)
         self.printV('T:', [str(t)+':'+str(T[t]) for t in T])
-        for i in self.getGrammarWeather()["lexicon"]:
-            print(i)
         # Construct X_i:j from Y_i:j + Z_j+i:k, shortest spans first
         for i, j, k in self.subspans(len(words)):
             for X, Y, Z, p in self.getGrammarSyntaxRules(grammar):
@@ -309,7 +311,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("".split(), c.getGrammarWeather())
+    c.CYKParse("will today be hotter than tomorrow".split(), c.getGrammarWeather())
 
 
 
