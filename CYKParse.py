@@ -175,7 +175,8 @@ class VacationParser:
                 ['Noun', 'sailing', 0.01],
                 ['Noun', 'skydiving', 0.01],
                 ['Noun', 'hiking', 0.01],
-                ['Det', 'next', 1.0],
+                ['Det', 'next', 0.5],
+                ['Det', 'this', 0.5],
 
                 ['Preposition', 'with', 0.25],
                 ['Preposition', 'in', 0.25],
@@ -308,7 +309,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("i want to scuba dive tomorrow in irvine".split(), c.getGrammarWeather())
+    c.CYKParse("".split(), c.getGrammarWeather())
 
 
 
