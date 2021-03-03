@@ -14,10 +14,22 @@ class VacationBot:
     }
 
     ACTIVITIES = {
-        "surf", "ski", "sail", "sled", "snowboard",
-        "kayak", "fish", "dive", "golf", "hike", "skydive",
-        "surfing", "skiing", "sailing", "sledding", "snowboarding",
-        "kayaking", "fishing", "diving", "golfing", "hiking", "skydiving"
+        "surf", "sail",
+        "kayak", "fish", "dive", "golf",
+        "surfing", "sailing",
+        "kayaking", "fishing", "diving", "golfing",
+    }
+
+    # Activities which may be dangerous if done in not clear/sunny weather
+    CLEAR_ACTIVITIES = {
+        "hike", "skydive",
+        "hiking", "skydiving"
+    }
+
+    # Activities that can only be done if snowing (which is a bit pointless in California)
+    SNOW_ACTIVITIES = {
+        "ski", "sled", "snowboard",
+        "skiing", "sledding", "snowboarding",
     }
 
     WEATHER_KEYWORDS = {
@@ -41,6 +53,7 @@ class VacationBot:
         self.Parser = parser
         self.Wrapper = wrapper
         self.sentenceTree = None
+        self.validSentence = False
 
         # chatbot state flags
         self.comparing = False
@@ -50,15 +63,20 @@ class VacationBot:
         self.needsRec = False
         self.question = False
         self.weatherQuery = False
+        self.goodbye = False
 
     # Given the collection of parse trees returned by CYKParse, this function
     # returns the one corresponding to the complete sentence.
     def getSentenceParse(self, T):
         sentenceTrees = {k: v for k, v in T.items() if k.startswith('S/0')}
-        completeTree = max(sentenceTrees.keys())
-        self.sentenceTree = T[completeTree]
-        print('getSentenceParse:', self.sentenceTree)
-        return self.sentenceTree
+        if sentenceTrees.keys():
+            self.validSentence = True
+            completeTree = max(sentenceTrees.keys())
+            self.sentenceTree = T[completeTree]
+            print('getSentenceParse:', self.sentenceTree)
+            return self.sentenceTree
+        else:
+            return None
 
     # Processes the leaves of the parse tree to pull out the user's request.
     def updateRequestInfo(self):
@@ -73,6 +91,9 @@ class VacationBot:
         self.requestInfo["time0"] = ""
 
         for leaf in self.sentenceTree.getLeaves():
+            if leaf[1] in ("goodbye", "bye-bye", "bye"):
+                self.goodbye = True
+
             if leaf[1] in self.ACTIVITIES:
                 self.requestInfo["activity"] = leaf[1]
                 self.hasActivity = True
@@ -180,42 +201,63 @@ class VacationBot:
     def userSay(self, sentence):
         self.sentenceTree, _ = self.Parser.CYKParse(sentence.lower().split(), self.Parser.getGrammarWeather())
         self.sentenceTree = self.getSentenceParse(self.sentenceTree)
-        self.updateRequestInfo()
+        if self.sentenceTree:
+            self.updateRequestInfo()
 
     # Format a reply to the user, based on what the user wrote.
     def reply(self):
-        if self.weatherQuery:
-            if self.requestInfo["location"] or (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]):
+        if self.validSentence:
+            if self.goodbye:
+                bye_templates = (
+                    "Have a nice trip, and stay safe.",
+                    "Goodbye, and have a great vacation.",
+                    "Bye-bye! I hope my recommendations helped you out.",
+                    "See you next time."
+                )
+                print(random.choice(bye_templates))
+
+            elif self.weatherQuery:
+                if self.requestInfo["location"] or (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]):
+                    if self.requestInfo["location"]:
+                        loc = self.requestInfo["location"]
+                    elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                        loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+                    time = self.requestInfo["time"]
+                    temp = self.getTemperature(loc, time)
+                    weather = self.getWeather(loc, time)
+
+                    templates = (
+                        f"The weather in {loc} {time} is {weather}, with a temperature of {temp}F.",
+                        f"It's {weather} {time} in {loc}, with a temperature of {temp}F."
+                    )
+                    print(random.choice(templates))
+
+            elif self.comparing:
                 if self.requestInfo["location"]:
                     loc = self.requestInfo["location"]
                 elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
                     loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
                 time = self.requestInfo["time"]
+                time0 = self.requestInfo["time0"]
                 temp = self.getTemperature(loc, time)
-                weather = self.getWeather(loc, time)
+                temp0 = self.getTemperature(loc, time0)
+                comp = self.requestInfo["compareWord"]
+                if self.requestInfo["compare"]:
+                    print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                          f"It is {temp}F {time} and {temp0}F {time0}.")
+                else:
+                    print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                          f"It is {temp}F {time} and {temp0}F {time0}.")
+        else:
+            invalid_templates = (
+                "Remember that I only talk about weather and vacations, and I don't do well with other topics.",
+                "Sorry, I didn't understand what you said. Can you rephrase that again?",
+                "Can you rephrase that again? I didn't understand that sentence.",
+                "You'll have to excuse my very small vocabulary, "
+                "so please try to keep it relevant to weather and vacations and that kind of stuff."
+            )
+            print(random.choice(invalid_templates))
 
-                templates = (
-                    f"The weather in {loc} {time} is {weather}, with a temperature of {temp}F.",
-                    f"It's {weather} {time} in {loc}, with a temperature of {temp}F."
-                )
-                print(random.choice(templates))
-
-        elif self.comparing:
-            if self.requestInfo["location"]:
-                loc = self.requestInfo["location"]
-            elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
-                loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
-            time = self.requestInfo["time"]
-            time0 = self.requestInfo["time0"]
-            temp = self.getTemperature(loc, time)
-            temp0 = self.getTemperature(loc, time0)
-            comp = self.requestInfo["compareWord"]
-            if self.requestInfo["compare"]:
-                print(f"Yes, {time} is {comp} than {time0} in {loc}. "
-                      f"It is {temp}F {time} and {temp0}F {time0}.")
-            else:
-                print(f"No, {time} is not {comp} than {time0} in {loc}. "
-                      f"It is {temp}F {time} and {temp0}F {time0}.")
 
 
 if __name__ == "__main__":
@@ -227,38 +269,3 @@ if __name__ == "__main__":
         c.userSay(user_in)
         c.reply()
 
-    # # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
-    # T, P = CYKParse.CYKParse(['hi', 'my', 'name', 'is', 'Peter'], CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()
-
-    # T, P = CYKParse.CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'now'], CYKParse.getGrammarWeather())
-    # T, P = CYKParse.CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'tomorrow'], CYKParse.getGrammarWeather())
-    # T, P = CYKParse.CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Tustin', 'yesterday'], CYKParse.getGrammarWeather())
-    # T, P = CYKParse.CYKParse("will tomorrow be hotter than today in Irvine".split(), CYKParse.getGrammarWeather())
-
-    # T, P = CYKParse.CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Tustin', 'yesterday'], CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()
-
-    # T, P = CYKParse.CYKParse(['what', 'is', 'now', 'the', 'temperature', 'in', 'Irvine'], CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()
-    #
-    # T, P = CYKParse.CYKParse(['what', 'is', 'the', 'temperature', 'in', 'Irvine', 'tomorrow'], CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()
-    #
-    # T, P = CYKParse.CYKParse("will today be colder than tomorrow in Pasadena".split(), CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()
-    #
-    # T, P = CYKParse.CYKParse("will today be hotter than today in".split(), CYKParse.getGrammarWeather())
-    # sentenceTree = getSentenceParse(T)
-    # updateRequestInfo(sentenceTree)
-    # reply()

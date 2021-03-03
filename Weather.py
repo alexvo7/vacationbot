@@ -107,7 +107,8 @@ if __name__ == "__main__":
     # get() or getWeekly() cities here
     w.get("sacramento")
 
-    #
+
+    # end
     print(w)
 
 

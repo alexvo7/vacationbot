@@ -66,8 +66,6 @@ class VacationParser:
         self.verbose = False
         self.weatherGrammar = {
             'syntax' : [
-                ['S', 'Farewell', '', 0.05],
-                ['S', 'Farewell', 'S', 0.05],
                 ['S', 'NP', 'VP', 0.1],
                 ['S', 'NP', 'Verb', 0.05],
                 ['S', 'Noun', 'VP', 0.05],
@@ -201,9 +199,9 @@ class VacationParser:
                 ['Adjective', 'clear', 0.1],
                 ['Adjective', 'snowy', 0.1],
 
-                ['Farewell', 'goodbye', 0.33],
-                ['Farewell', 'bye', 0.33],
-                ['Farewell', 'bye-bye', 0.33],
+                ['S', 'goodbye', 0.33],
+                ['S', 'bye', 0.33],
+                ['S', 'bye-bye', 0.33],
             ]
         }
 
@@ -311,7 +309,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("will today be hotter than tomorrow".split(), c.getGrammarWeather())
+    c.CYKParse("goodbye".split(), c.getGrammarWeather())
 
 
 
