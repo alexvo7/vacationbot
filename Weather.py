@@ -31,12 +31,12 @@ class OWMWrapper:
             status_code = r.status_code
             if status_code == 200:
                 r = r.json()
-                d = {0:
-                    {
-                    "temp": r["main"]["temp"],
-                    "weather": r["weather"][0]["main"].lower()
-                    }
-                }
+                print(r)
+                d = {0: {"temp": r["main"]["temp"],
+                         "weather": r["weather"][0]["main"].lower(),
+                         "wind": r["wind"]["speed"]
+                         }
+                     }
                 self.DB[city] = d
             return status_code
 

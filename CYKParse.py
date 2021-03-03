@@ -194,11 +194,15 @@ class VacationParser:
 
                 # weather adjectives
                 ['Adjective', 'sunny', 0.1],
-                ['Adjective', 'rainy', 0.1],
+                ['Adjective', 'raining', 0.1],
                 ['Adjective', 'cloudy', 0.1],
                 ['Adjective', 'clear', 0.1],
-                ['Adjective', 'snowy', 0.1],
+                ['Adjective', 'snowing', 0.1],
 
+                ['S', 'hi', 0.25],
+                ['S', 'hello', 0.25],
+                ['S', 'hey', 0.25],
+                ['S', 'yo', 0.25],
                 ['S', 'goodbye', 0.33],
                 ['S', 'bye', 0.33],
                 ['S', 'bye-bye', 0.33],
@@ -309,7 +313,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("goodbye".split(), c.getGrammarWeather())
+    c.CYKParse("should i surf".split(), c.getGrammarWeather())
 
 
 
