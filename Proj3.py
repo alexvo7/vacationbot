@@ -1,6 +1,8 @@
 from CYKParse import VacationParser, Tree
 from Weather import OWMWrapper
+from typing import List
 import random
+
 
 class VacationBot:
     VALID_CITIES = {
@@ -257,6 +259,7 @@ class VacationBot:
                     "Hi! I can help you with anything vacation related!"
                 ]
                 print(random.choice(greeting_templates))
+                return
 
             if self.goodbye:
                 bye_templates = [
@@ -266,6 +269,7 @@ class VacationBot:
                     "See you next time!"
                 ]
                 print(random.choice(bye_templates))
+                return
 
             if self.invalidLocation and self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
                 loc = self.formatCityName(
@@ -318,7 +322,6 @@ class VacationBot:
             elif self.needsRec:
                 if not (self.hasLocation or self.hasActivity):
                     suggestions = self.citySuggestions(self.HOTSPOTS)
-                    print("FUffff")
                     loc_rec_template = [
                         f"{suggestions} are all great cities to visit!",
                         f"There are some great things to do in {suggestions}!",
@@ -391,7 +394,7 @@ class VacationBot:
                     good_template = [
                         f"Yes, {loc} is a great place to go {activity} {time}.",
                         f"You should definitely go {activity} there. Great choice!",
-                        f"I see nothing wrong with it. Enjoy your trip!"
+                        f"I see nothing wrong with that. Enjoy your trip!"
                     ]
 
                     if temp != "unknown" and float(temp) < 50:
@@ -468,23 +471,44 @@ class VacationBot:
                             ]
                             print(random.choice(bad_wind_template))
 
-            elif not self.needsRec and self.hasActivity and not self.hasLocation:
-                activity = self.requestInfo["activity"]
-                print(f"Sounds fun! Where will you go {activity}?")
+            elif not self.needsRec:
+                if not self.hasActivity and not self.hasLocation and not self.hasTime:
+                    suggestions = self.citySuggestions(self.HOTSPOTS)
+                    loc_rec_template = [
+                        f"{suggestions} are all great cities to visit!",
+                        f"There are some great things to do in {suggestions}!",
+                        f"{suggestions} are some of the most popular locations in California. "
+                        f"You should check them out!"
+                    ]
+                    print(random.choice(loc_rec_template))
 
-            elif self.hasLocation and self.hasActivity:
-                activity = self.requestInfo["activity"]
-                loc = self.formatCityName(
-                    self.getLocation()
-                )
-                if self.hasTime:
+                elif self.hasActivity and not self.hasLocation and self.hasTime:
+                    activity = self.requestInfo["activity"]
+                    print(f"Sounds fun! Where will you go {activity}?")
+
+                elif self.hasActivity and not self.hasLocation and not self.hasTime:
+                    activity = self.requestInfo["activity"]
+                    print(f"When do you plan to go {activity} in?")
+
+                elif self.hasActivity and self.hasLocation and not self.hasTime:
+                    activity = self.requestInfo["activity"]
+                    loc = self.formatCityName(
+                        self.getLocation()
+                    )
+                    print(f"When do you plan to go {activity} in {loc}?")
+
+                elif self.hasActivity and self.hasLocation and self.hasTime:
+                    activity = self.requestInfo["activity"]
+                    loc = self.formatCityName(
+                        self.getLocation()
+                    )
                     time = self.requestInfo["time"]
 
                     temp, weather, wind = self.getCityInfo(loc, time)
                     good_template = [
-                        f"Yes, {loc} is a great place to go {activity} {time}.",
+                        f"{loc} is a great place to go {activity} {time}.",
                         f"You should definitely go {activity} there. Great choice!",
-                        f"I see nothing wrong with it. Enjoy your trip!"
+                        f"I see nothing wrong with that. Enjoy your trip!"
                     ]
 
                     if temp != "unknown" and float(temp) < 50:
@@ -522,7 +546,7 @@ class VacationBot:
                                     f"I think {suggestions} are great places to {activity} instead.",
                                     f"If you want to {activity}, {suggestions} are some good cities for that."
                                 ]
-                                print(f"No, because {loc} is not a coastal city. "
+                                print(f"{loc} is not a coastal city. "
                                       f"{self.recommendStr(activity, loc_prog_template, loc_template)}")
                                 return
 
@@ -558,11 +582,14 @@ class VacationBot:
                                 f"also makes it a bad time to go {activity} {time}."
                             ]
                             print(random.choice(bad_wind_template))
-                else:
+
                     if activity in self.COASTAL_ACTIVITIES and loc.lower() not in self.COASTAL_CITIES:
                         print(f"{loc} isn't a coastal city, so you can't go {activity} there!")
                     else:
                         print(f"That's good for you. When will you go {activity}?")
+
+                else:
+                    print("Something went wrong... your sentence may have been worded funny.")
 
             elif self.comparing:
                 loc = self.formatCityName(
@@ -679,7 +706,7 @@ class VacationBot:
             city = self.formatCityName(random.choice(locs))
         return f"{', '.join(cities)} {join} {city}"
 
-    def recommendStr(self, activity: str, ing_template: list[str], template: list[str]):
+    def recommendStr(self, activity: str, ing_template: List[str], template: List[str]):
         """Returns the correct template based on whether 'activity' is the progressive tense of the verb."""
         if activity[-3:] == "ing":
             return random.choice(ing_template)

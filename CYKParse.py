@@ -1,5 +1,5 @@
 import Tree
-
+from typing import List
 
 class VacationParser:
     # hardcoded list of top 100 cities in California (from Wikipedia)
@@ -164,7 +164,7 @@ class VacationParser:
                 ['Noun', 'weather', 0.3],
                 ['Noun', 'activity', 0.1],
                 ['Noun', 'today', 0.05],
-                ['Noun', 'tomorrow', 0.05]
+                ['Noun', 'tomorrow', 0.05],
 
                 # activities
                 ['Noun', 'surfing', 0.01],
@@ -223,7 +223,7 @@ class VacationParser:
         if self.verbose:
             print(*args)
 
-    def CYKParse(self, words: list[str], grammar):
+    def CYKParse(self, words: List[str], grammar):
         """
         A Python implementation of the CYK-Parse algorithm.
         From Artificial Intelligence: A Modern Approach (Russell, Norvig)
@@ -277,7 +277,7 @@ class VacationParser:
         return T, P
 
 
-    def subspans(self, N):
+    def subspans(self, N: int):
         """
         CS 171, Prof. Robert Frost
         Python uses 0-based indexing, requiring some changes from the book's
@@ -289,7 +289,7 @@ class VacationParser:
                 for j in range(i, k):
                     yield i, j, k
 
-    def getGrammarLexicalRules(self, grammar, word):
+    def getGrammarLexicalRules(self, grammar, word: str):
         """
         CS 171, Prof. Robert Frost
         These two getXXX functions use yield instead of return so that a single pair can be sent back,
@@ -310,7 +310,7 @@ class VacationParser:
     def setVerbose(self, val: bool):
         self.verbose = val
 
-    def addLexicon(self, city, pos):
+    def addLexicon(self, city: str, pos: str):
         """
         There is space for 100 cities, so each city is assigned a probability of 0.01.
         All cities are in California only.
