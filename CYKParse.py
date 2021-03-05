@@ -62,6 +62,8 @@ class VacationParser:
         'oaks', 'gate', 'heights', 'barbara', 'monica'
     }
 
+
+
     def __init__(self):
         self.verbose = False
         self.weatherGrammar = {
@@ -313,7 +315,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("should i surf".split(), c.getGrammarWeather())
+    c.CYKParse("what should i do in irvine".split(), c.getGrammarWeather())
 
 
 

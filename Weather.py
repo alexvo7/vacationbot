@@ -31,7 +31,6 @@ class OWMWrapper:
             status_code = r.status_code
             if status_code == 200:
                 r = r.json()
-                print(r)
                 d = {0: {"temp": r["main"]["temp"],
                          "weather": r["weather"][0]["main"].lower(),
                          "wind": r["wind"]["speed"]
@@ -74,6 +73,7 @@ class OWMWrapper:
                         self.DB[city][day] = {}
                     self.DB[city][day]["temp"] = rq["daily"][day]["temp"]["day"]
                     self.DB[city][day]["weather"] = rq["daily"][day]["weather"][0]["main"].lower()
+                    self.DB[city][day]["wind"] = rq["daily"][day]["wind_speed"]
 
         return status_code
 
@@ -93,6 +93,14 @@ class OWMWrapper:
                 return self.DB[city][t]["weather"]
         return "unknown"
 
+    # gets city wind speed (in mph) for time t, where today = t = 0
+    def getCityWind(self, city, t=0):
+        assert 0 <= t < 8, f"t was {t}"
+        if city.lower() in self.DB:
+            if t in self.DB[city]:
+                return self.DB[city][t]["wind"]
+        return "unknown"
+
     def __str__(self):
         s = "OWMWrapper.DB(\n"
         for key, val in self.DB.items():
@@ -105,7 +113,7 @@ class OWMWrapper:
 if __name__ == "__main__":
     w = OWMWrapper()
     # get() or getWeekly() cities here
-    w.get("sacramento")
+    w.get("irvine")
 
 
     # end

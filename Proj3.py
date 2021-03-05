@@ -3,6 +3,34 @@ from Weather import OWMWrapper
 import random
 
 class VacationBot:
+
+    VALID_CITIES = {
+        "santa": {"ana", "clarita", "rosa", "clara", "barbara", "monica", "maria"},
+        "san": {"jose", "francisco", "diego", "bernardino", "mateo", "marcos", "leandro"},
+        "newport": ["beach"],
+        "west": ["covina"],
+        "long": ["beach"],
+        "daly": ["city"],
+        "mission": ["viejo"],
+        "costa": ["mesa"],
+        "elk": ["grove"],
+        "redwood": ["city"],
+        "citrus": ["heights"],
+        "rancho": ["cucamonga"],
+        "lake": ["forest"],
+        "chula": ["vista"],
+        "simi": ["valley"],
+        "jurupa": ["valley"],
+        "moreno": ["valley"],
+        "thousand": ["oaks"],
+        "huntington": ["beach"],
+        "south": ["gate"],
+        "garden": ["grove"],
+        "los": ["angeles"],
+        "chino": ["hills"],
+        "el": ["monte", "cajon"]
+    }
+
     HOTSPOTS = {
         "Los Angeles", "San Francisco", "San Diego", "Santa Monica", "Santa Barbara",
         "Santa Cruz", "Long Beach", "Sacramento", "Anaheim", "Oakland",
@@ -15,24 +43,15 @@ class VacationBot:
         "santa monica", "oxnard", "ventura"
     }
 
-    ACTIVITIES = {
-        "surf", "sail", "fish", "dive", "golf",
-        "surfing", "sailing", "fishing", "diving", "golfing"
-    }
-
-    WARM_ACTIVITIES = {
-
-    }
-
     COASTAL_ACTIVITIES = {
         "surf", "sail", "fish", "dive",
         "surfing", "sailing", "fishing", "diving"
     }
 
-    # Activities which may be dangerous if done in not clear/sunny weather
+    # Activities which may be dangerous/not ideal in not clear/sunny weather
     CLEAR_ACTIVITIES = {
-        "hike", "skydive", "kayak", "surf",
-        "hiking", "skydiving", "kayaking", "surfing"
+        "hike", "skydive", "kayak", "surf", "golf", "fish",
+        "hiking", "skydiving", "kayaking", "surfing", "golfing", "fishing"
     }
 
     # Activities that can only be done if snowing (which is a bit pointless in California)
@@ -41,7 +60,7 @@ class VacationBot:
         "skiing", "sledding", "snowboarding"
     }
 
-    ALL_ACTIVITIES = ACTIVITIES | CLEAR_ACTIVITIES | SNOW_ACTIVITIES | COASTAL_ACTIVITIES
+    ALL_ACTIVITIES = CLEAR_ACTIVITIES | SNOW_ACTIVITIES | COASTAL_ACTIVITIES
 
     WEATHER_KEYWORDS = {
         "raining", "cloudy", "sunny", "snowing", "clear"
@@ -63,18 +82,18 @@ class VacationBot:
             'locPrefix': '',
             'locSuffix': '',
             'time0': '',
-            'compare': None,    # bool result of comparison
             'compareWord': '',  # hotter/warmer/colder/cooler
             'weatherWord': '',
-            'activity': '',
+            'activity': ''
         }
 
         self.Parser = parser
         self.Wrapper = wrapper
         self.sentenceTree = None
-        self.validSentence = False
+        self.tokens = -1
 
         # chatbot state flags
+        self.validSentence = False
         self.comparing = False
         self.hasLocation = False
         self.hasActivity = False
@@ -85,16 +104,21 @@ class VacationBot:
         self.hasWeatherWord = False
         self.isGreeting = False
         self.goodbye = False
+        self.invalidLocation = False
 
 
     # Given the collection of parse trees returned by CYKParse, this function
     # sets self.sentenceTree as the one corresponding to the complete sentence.
     # If it does not exist, self.sentenceTree is set to None.
+    # A sentence is valid if all tokens in user input are parsed.
     def getSentenceParse(self, T):
         sentenceTrees = {k: v for k, v in T.items() if k.startswith('S/0')}
         if sentenceTrees.keys():
+            completeTree = max(sentenceTrees.keys())    # completeTree formatted "S/0/#"
+            if int(completeTree[-1]) + 1 != self.tokens:
+                self.sentenceTree = None
+                return
             self.validSentence = True
-            completeTree = max(sentenceTrees.keys())
             self.sentenceTree = T[completeTree]
             if self.DEBUG:
                 print('getSentenceParse:', self.sentenceTree)
@@ -104,17 +128,7 @@ class VacationBot:
     # Processes the leaves of the parse tree to pull out the user's request.
     # Resets chatbot state for every user query (except for location and time).
     def updateRequestInfo(self):
-        self.comparing = False
-        self.hasLocation = False
-        self.hasActivity = False
-        self.hasTime = False
-        self.needsRec = False
-        self.question = False
-        self.weatherQuery = False
-        self.hasWeatherWord = False
-        self.isGreeting = False
-        self.requestInfo["compare"] = None
-        self.requestInfo["time0"] = ""
+        self.resetStatus()
 
         if not self.sentenceTree:
             self.validSentence = False
@@ -134,7 +148,7 @@ class VacationBot:
             if leaf[0] == "WQuestion":
                 self.question = True
 
-            if leaf[0] == 'Adverb' and not self.hasTime:
+            if leaf[0] == 'Adverb' and leaf[1] in ("today", "tomorrow") and not self.hasTime:
                 self.requestInfo['time'] = leaf[1]
                 self.hasTime = True
 
@@ -148,9 +162,17 @@ class VacationBot:
                     self.requestInfo["location"] = ""
                     if leaf[0] == "CityPrefix":
                         self.requestInfo["locPrefix"] = leaf[1]
-                    else:
+                    elif leaf[0] == "CitySuffix":
                         self.requestInfo["locSuffix"] = leaf[1]
                         self.hasLocation = True
+                        if leaf[1] not in self.VALID_CITIES[self.requestInfo["locPrefix"]]:
+                            self.hasLocation = False
+                            self.invalidLocation = True
+                    else:
+                        self.requestInfo["locPrefix"] = ""
+                        self.requestInfo["locSuffix"] = ""
+                        self.hasLocation = False
+                        self.invalidLocation = True
 
             if self.question:
                 if leaf[1] in ("weather", "temperature"):
@@ -180,46 +202,48 @@ class VacationBot:
                 if self.hasLocation:
                     time0 = self.requestInfo["time0"]
                     time = self.requestInfo["time"]
-                    loc = ""
-                    if self.requestInfo["location"]:
-                        loc = self.requestInfo["location"]
-                    elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
-                        loc = f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+                    loc = self.getLocation()
 
                     time0_temp = self.getTemperature(loc, time0)
                     time_temp = self.getTemperature(loc, time)
 
-                    if (time0_temp != "unknown" and time_temp != "unknown"):
-                        if self.requestInfo['compareWord'] in ('hotter', 'warmer'):
-                            self.requestInfo['compare'] = time_temp > time0_temp
-                        elif self.requestInfo['compareWord'] in ('colder', 'cooler'):
-                            self.requestInfo['compare'] = time_temp < time0_temp
-
-            if self.DEBUG:
-                print(self.sentenceTree)
-                print("self.validSentence:", self.validSentence)
-                print("self.comparing:", self.comparing)
-                print("self.hasLocation:", self.hasLocation)
-                print("self.hasActivity:", self.hasActivity)
-                print("self.hasTime:", self.hasTime)
-                print("self.needsRec:", self.needsRec)
-                print("self.question:", self.question)
-                print("self.weatherQuery:", self.weatherQuery)
-                print("self.hasWeatherWord:", self.hasWeatherWord)
-                print("self.isGreeting:", self.isGreeting)
-                print("self.goodbye:", self.goodbye)
-                print("updateRequestInfo", self.requestInfo)
-
     # gives user input to chatbot
     def say(self, sentence):
-        self.sentenceTree, _ = self.Parser.CYKParse(sentence.lower().split(), self.Parser.getGrammarWeather())
+        if self.DEBUG and sentence == "print":
+            print("PRINT DEBUG")
+            print("\tself.requestInfo: ", self.requestInfo)
+            print("\tself.Wrapper.DB: ", self.Wrapper.DB)
+            self.resetStatus()
+            return
+        elif not self.DEBUG and sentence == "print":
+            print("\"print\" is not available if self.DEBUG = False.")
+
+        tokens = sentence.lower().split()
+        self.tokens = len(tokens)
+        self.sentenceTree, _ = self.Parser.CYKParse(tokens, self.Parser.getGrammarWeather())
         self.getSentenceParse(self.sentenceTree)
         self.updateRequestInfo()
 
     # Format a reply to the user, based on what the user wrote.
     def reply(self):
         if self.DEBUG:
-            print("replying")
+            print(self.sentenceTree)
+            print("self.validSentence:", self.validSentence)
+            print("self.comparing:", self.comparing)
+            print("self.hasLocation:", self.hasLocation)
+            print("self.hasActivity:", self.hasActivity)
+            print("self.hasTime:", self.hasTime)
+            print("self.needsRec:", self.needsRec)
+            print("self.question:", self.question)
+            print("self.weatherQuery:", self.weatherQuery)
+            print("self.hasWeatherWord:", self.hasWeatherWord)
+            print("self.isGreeting:", self.isGreeting)
+            print("self.goodbye:", self.goodbye)
+            print("self.invalidLocation:", self.invalidLocation)
+            print("self.requestInfo:", self.requestInfo)
+
+        if self.DEBUG and self.validSentence:
+            print("REPLYING")
         if self.validSentence:
             if self.isGreeting:
                 greeting_templates = (
@@ -239,17 +263,18 @@ class VacationBot:
                 )
                 print(random.choice(bye_templates))
 
+            if self.invalidLocation and self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                loc = self.formatCityName(
+                    f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+                )
+                print(f"{loc} is an invalid location for me. Sorry, I can't help you with that.")
+                return
+
             elif self.weatherQuery:
-                if self.requestInfo["location"] or (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]):
-                    loc = ""
-                    if self.requestInfo["location"]:
-                        loc = self.formatCityName(
-                            self.requestInfo["location"]
-                        )
-                    elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
-                        loc = self.formatCityName(
-                            f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
-                        )
+                if self.hasLocation:
+                    loc = self.formatCityName(
+                        self.getLocation()
+                    )
 
                     time = self.requestInfo["time"]
                     temp = self.getTemperature(loc, time)
@@ -261,9 +286,9 @@ class VacationBot:
                                 self.requestInfo["weatherWord"]
                             )
                         if weather == w:
-                            print(f"Yes, it's {weather} in {loc} {time}.")
+                            print(f"Yes, it's {w} in {loc} {time}.")
                         else:
-                            print(f"No, it's not {weather} in {loc} {time}.")
+                            print(f"No, it's not {w} in {loc} {time}. It's {weather}.")
                     else:
                         templates = (
                             f"The weather in {loc} {time} is {weather}, with a temperature of {temp}F.",
@@ -272,41 +297,247 @@ class VacationBot:
                         print(random.choice(templates))
 
             elif self.needsRec:
-                if ((not self.requestInfo["location"] or
-                        (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]))
-                        and not self.requestInfo["time"]):
-                    pass
+                if not (self.hasLocation or self.hasActivity):
+                    suggestions = self.citySuggestions(self.HOTSPOTS)
+                    print("FUffff")
+                    loc_rec_template = (
+                        f"{suggestions} are all great cities to visit!",
+                        f"There are some great things to do in {suggestions}!",
+                        f"{suggestions} are some of the most popular locations in California. "
+                        f"You should check them out!"
+                    )
+                    print(random.choice(loc_rec_template))
 
-                elif (not self.requestInfo["location"] or
-                        (self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"])):
-                    pass
+                elif not self.hasLocation:
+                    activity = self.requestInfo["activity"]
+                    if activity in self.COASTAL_ACTIVITIES:
+                        suggestions = self.citySuggestions(self.COASTAL_CITIES)
+                        loc_prog_template = (
+                            f"{suggestions} are nice cities for {activity}!",
+                            f"I think {suggestions} are great places for {activity}.",
+                            f"{activity.capitalize()}? {suggestions} are some good places."
+                        )
+                        loc_template = (
+                            f"{suggestions} are nice cities to {activity} in!",
+                            f"I think {suggestions} are great places to {activity}.",
+                            f"You want to {activity}? {suggestions} are some good places."
+                        )
+                        print(f"Depends on the weather. "
+                              f"{self.recommendStr(activity, suggestions, loc_prog_template, loc_template)}")
 
-                elif not self.requestInfo["time"]:
-                    pass
+                    elif activity in self.CLEAR_ACTIVITIES:
+                        suggestions = self.citySuggestions(self.HOTSPOTS)
+                        loc_prog_template = (
+                            f"{suggestions} are nice cities for {activity}!",
+                            f"I think {suggestions} are great places for {activity}.",
+                            f"{activity.capitalize()}? {suggestions} are some good places."
+                        )
+                        loc_template = (
+                            f"{suggestions} are nice cities to {activity} in!",
+                            f"I think {suggestions} are great places to {activity}.",
+                            f"You want to {activity}? {suggestions} are some good places."
+                        )
+                        print(f"Depends on the weather. "
+                              f"{self.recommendStr(activity, suggestions, loc_prog_template, loc_template)}")
+
+                    elif activity in self.SNOW_ACTIVITIES:
+                        print(f"Snow is pretty rare here, but if you want to go {activity}, check the weather first!")
+
+                    else:
+                        # The code should NOT reach here
+                        print("Something went wrong... your sentence may have been worded funny.")
+
+                elif not self.hasActivity:
+                    loc = self.formatCityName(
+                        self.getLocation()
+                    )
+
+                    if loc in self.COASTAL_CITIES:
+                        print(f"Since {loc} is a coastal city, you can take the opportunity to "
+                              f"go surfing, sailing, or scuba diving! Or you can do regular activities "
+                              f"such as hiking and golfing.")
+                    else:
+                        print(f"Depending on the weather, you can go "
+                              f"{random.choice(tuple(self.CLEAR_ACTIVITIES))} in {loc}.")
 
                 else:
-                    loc = ""
-                    if self.requestInfo["location"]:
-                        loc = self.formatCityName(
-                            self.requestInfo["location"]
-                        )
-                    elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
-                        loc = self.formatCityName(
-                            f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
-                        )
+                    loc = self.formatCityName(
+                        self.getLocation()
+                    )
 
                     time = self.requestInfo["time"]
+                    wind = self.getWind(loc, time)
+                    activity = self.requestInfo["activity"]
+                    good_template = (
+                        f"Yes, {loc} is a great place to go {activity} {time}.",
+                        f"You should definitely go {activity} there. Great choice!",
+                        f"I see nothing wrong with it. Enjoy your trip!"
+                    )
+                    # arbitrary number, but 20 mph wind must be uncomfortable, so no vacation
+                    if wind != "unknown" and float(wind) < 20:
+                        weather = self.weatherAdj(self.getWeather(loc, time))
 
+                        if (activity in self.COASTAL_ACTIVITIES
+                                and loc.lower() in self.COASTAL_CITIES
+                                and weather not in ("raining", "snowing")):
+                            print(random.choice(good_template))
+                            return
+                        elif (activity in self.COASTAL_ACTIVITIES
+                                and loc.lower() in self.COASTAL_CITIES
+                                and weather in ("raining", "snowing")):
+                            coastal_bad_template = (
+                                f"No, I wouldn't recommend you to go {activity} in {loc} "
+                                f"since it's {weather} {time}.",
+                                f"How unlucky, it's {weather} {time}. Maybe next time!"
+                            )
+                            print(random.choice(coastal_bad_template))
+                            return
+                        elif activity in self.COASTAL_ACTIVITIES:
+                            suggestions = self.citySuggestions(self.COASTAL_CITIES)
+
+                            loc_prog_template = (
+                                f"{suggestions} are nice cities for {activity}--you should check them out.",
+                                f"I think {suggestions} are great places for {activity} instead.",
+                                f"{suggestions} are some good cities for that."
+                            )
+                            loc_template = (
+                                f"{suggestions} are nice cities to {activity}--you should check them out.",
+                                f"I think {suggestions} are great places to {activity} instead.",
+                                f"If you want to {activity}, {suggestions} are some good cities for that."
+                            )
+                            print(f"No, because {loc} is not a coastal city. "
+                                  f"{self.recommendStr(activity, suggestions, loc_prog_template, loc_template)}")
+                            return
+
+                        if (activity in self.CLEAR_ACTIVITIES and weather not in ("raining", "snowing")):
+                            print(random.choice(good_template))
+                            return
+                        elif weather in ("raining", "snowing"):
+                            bad_weather_template = (
+                                f"The weather {time} is {weather}, which may ruin your experience, "
+                                f"so I suggest you go {activity} another time.",
+                                f"Not only do certain activities become potentially dangerous, "
+                                f"the weather {time} is {weather}, which makes it a bad time to go {activity} {time}."
+                            )
+                            print(random.choice(bad_weather_template))
+                            return
+
+                        if (activity in self.SNOW_ACTIVITIES and weather == "snowing"):
+                            print(f"It's snowing in {loc} {time}? You better take advantage of this opportunity!")
+                        elif (activity in self.SNOW_ACTIVITIES and weather != "snowing"):
+                            print(f"How are you going to go {activity} in {loc} {time} when it's not even snowing?")
+                        elif activity not in self.SNOW_ACTIVITIES and weather == "snowing":
+                            print(f"It's snowing in {loc}, CA! But that means you can't go {activity} here!")
+                        else:
+                            # We should not be here
+                            print(f"Something went wrong... your sentence may have been worded funny.")
+                        return
+
+                    else:
+                        bad_wind_template = (
+                            f"The wind speed in {loc} is {wind} mph {time}, which may ruin your experience. "
+                            f"I suggest you go {activity} another time.",
+                            f"Not only do certain activities become potentially dangerous, a {wind} mph wind speed "
+                            f"also makes it a bad time to go {activity} {time}."
+                        )
+                        print(random.choice(bad_wind_template))
+
+            elif not self.needsRec and self.hasActivity and not self.hasLocation:
+                activity = self.requestInfo["activity"]
+                print(f"Sounds fun! Where will you go {activity}?")
+
+            elif self.hasLocation and self.hasActivity:
+                activity = self.requestInfo["activity"]
+                loc = self.formatCityName(
+                    self.getLocation()
+                )
+                if self.hasTime:
+                    time = self.requestInfo["time"]
+
+                    temp, weather, wind = self.getCityInfo(loc, time)
+                    good_template = (
+                        f"Yes, {loc} is a great place to go {activity} {time}.",
+                        f"You should definitely go {activity} there. Great choice!",
+                        f"I see nothing wrong with it. Enjoy your trip!"
+                    )
+
+                    if wind != "unknown" and float(wind) < 20:
+                        weather = self.weatherAdj(self.getWeather(loc, time))
+
+                        if (activity in self.COASTAL_ACTIVITIES
+                                and loc.lower() in self.COASTAL_CITIES
+                                and weather not in ("raining", "snowing")):
+                            print(random.choice(good_template))
+                            return
+                        elif (activity in self.COASTAL_ACTIVITIES
+                              and loc.lower() in self.COASTAL_CITIES
+                              and weather in ("raining", "snowing")):
+                            coastal_bad_template = (
+                                f"No, I wouldn't recommend you to go {activity} in {loc} "
+                                f"since it's {weather} {time}.",
+                                f"How unlucky, it's {weather} {time}. Maybe next time!"
+                            )
+                            print(random.choice(coastal_bad_template))
+                            return
+                        elif activity in self.COASTAL_ACTIVITIES:
+                            suggestions = self.citySuggestions(self.COASTAL_CITIES)
+
+                            loc_prog_template = (
+                                f"{suggestions} are nice cities for {activity}--you should check them out.",
+                                f"I think {suggestions} are great places for {activity} instead.",
+                                f"{suggestions} are some good cities for that."
+                            )
+                            loc_template = (
+                                f"{suggestions} are nice cities to {activity}--you should check them out.",
+                                f"I think {suggestions} are great places to {activity} instead.",
+                                f"If you want to {activity}, {suggestions} are some good cities for that."
+                            )
+                            print(f"No, because {loc} is not a coastal city. "
+                                  f"{self.recommendStr(activity, suggestions, loc_prog_template, loc_template)}")
+                            return
+
+                        if (activity in self.CLEAR_ACTIVITIES and weather not in ("raining", "snowing")):
+                            print(random.choice(good_template))
+                            return
+                        elif weather in ("raining", "snowing"):
+                            bad_weather_template = (
+                                f"The weather {time} is {weather}, which may ruin your experience, "
+                                f"so I suggest you go {activity} another time.",
+                                f"Not only do certain activities become potentially dangerous, "
+                                f"the weather {time} is {weather}, which makes it a bad time to go {activity} {time}."
+                            )
+                            print(random.choice(bad_weather_template))
+                            return
+
+                        if (activity in self.SNOW_ACTIVITIES and weather == "snowing"):
+                            print(f"It's snowing in {loc} {time}? You better take advantage of this opportunity!")
+                        elif (activity in self.SNOW_ACTIVITIES and weather != "snowing"):
+                            print(f"How are you going to go {activity} in {loc} {time} when it's not even snowing?")
+                        elif activity not in self.SNOW_ACTIVITIES and weather == "snowing":
+                            print(f"It's snowing in {loc}, CA! But that means you can't go {activity} here!")
+                        else:
+                            # We should not be here
+                            print(f"Something went wrong... your sentence may have been worded funny.")
+                        return
+
+                    else:
+                        bad_wind_template = (
+                            f"The wind speed in {loc} is {wind} mph {time}, which may ruin your experience. "
+                            f"I suggest you go {activity} another time.",
+                            f"Not only do certain activities become potentially dangerous, a {wind} mph wind speed "
+                            f"also makes it a bad time to go {activity} {time}."
+                        )
+                        print(random.choice(bad_wind_template))
+                else:
+                    if activity in self.COASTAL_ACTIVITIES and loc.lower() not in self.COASTAL_CITIES:
+                        print(f"{loc} isn't a coastal city, so you can't go {activity} there!")
+                    else:
+                        print(f"That's good for you. When will you go {activity}?")
 
             elif self.comparing:
-                if self.requestInfo["location"]:
-                    loc = self.formatCityName(
-                        self.requestInfo["location"]
-                    )
-                elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
-                    loc = self.formatCityName(
-                        f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
-                    )
+                loc = self.formatCityName(
+                    self.getLocation()
+                )
 
                 time = self.requestInfo["time"]
                 time0 = self.requestInfo["time0"]
@@ -314,23 +545,25 @@ class VacationBot:
                 temp0 = self.getTemperature(loc, time0)
                 comp = self.requestInfo["compareWord"]
 
-                if self.requestInfo["compare"]:
-                    print(f"Yes, {time} is {comp} than {time0} in {loc}. "
-                          f"It is {temp}F {time} and {temp0}F {time0}.")
+                if comp in ("hotter", "warmer"):
+                    if temp > temp0:
+                        print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                              f"It is {temp}F {time} and {temp0}F {time0}.")
+                    else:
+                        print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                              f"It is {temp}F {time} and {temp0}F {time0}.")
                 else:
-                    print(f"No, {time} is not {comp} than {time0} in {loc}. "
-                          f"It is {temp}F {time} and {temp0}F {time0}.")
-            elif self.needsRec:
-                pass
+                    if temp < temp0:
+                        print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                              f"It is {temp}F {time} and {temp0}F {time0}.")
+                    else:
+                        print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                              f"It is {temp}F {time} and {temp0}F {time0}.")
 
         else:
             invalid_templates = (
-                "Remember, I only talk about weather and vacations, so I'm not very good with other topics.",
                 "Sorry, I didn't understand what you said. Can you rephrase that again?",
-                "Can you rephrase that again? I didn't understand that sentence.",
-                "I hope that's a real sentence, because I didn't understand any of that.",
-                "You'll have to excuse my very small vocabulary, "
-                "so let's try to talk about weather and vacations."
+                "Can you rephrase that again? I didn't understand that sentence."
             )
             print(random.choice(invalid_templates))
 
@@ -340,6 +573,17 @@ class VacationBot:
 
     def getWeather(self, location, time):
         return self.getCityInfo(location, time)[1]
+
+    def getWind(self, location, time):
+        return self.getCityInfo(location, time)[2]
+
+    def getLocation(self):
+        if self.requestInfo["location"]:
+            return self.requestInfo["location"]
+        elif self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+            return f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
+        else:
+            return ""
 
     # Uses the OWMWrapper object to get weather if it doesn't exist in local DB already.
     # Returns "unknown" if location/temp doesn't exist.
@@ -362,14 +606,15 @@ class VacationBot:
 
             temp = self.Wrapper.getCityTemp(location, t)
             weather = self.Wrapper.getCityWeather(location, t)
+            wind = self.Wrapper.getCityWind(location, t)
             if self.DEBUG:
-                print(f"getTemperature {temp} {weather}")
+                print(f"getTemperature {temp}F {weather} {wind}mph")
 
             # getCityTemp returns NaN if couldn't get temperature
-            if temp == temp and weather != "unknown":
-                return (temp, weather)
+            if temp == temp and weather != "unknown" and wind != "unknown":
+                return temp, weather, wind
 
-        return ("unknown", "unknown")
+        return "unknown", "unknown", "unknown"
 
     # Capitalizes first letter in city names. Ex: san jose -> San Jose, irvine -> Irvine
     def formatCityName(self, city):
@@ -381,6 +626,37 @@ class VacationBot:
             return self.WEATHER_ADJS[weather]
         else:
             return weather
+
+    # Gets list of locations, randomly chooses a few, and returns as a string.
+    # For formatting purposes, the 'a' parameter defines whether the joining word is "and" or "or".
+    def citySuggestions(self, locs, a=True):
+        locs = tuple(locs)
+        join = "and" if a else "or"
+        cities = set((self.formatCityName(c) for c in random.sample(locs, random.randint(1, 3))))
+        city = self.formatCityName(random.choice(locs))
+        while city in cities:
+            city = self.formatCityName(random.choice(locs))
+        return f"{', '.join(cities)} {join} {city}"
+
+    def recommendStr(self, activity, suggestions, ing_template, template):
+        if activity[-3:] == "ing":
+            return random.choice(ing_template)
+        else:
+            return random.choice(template)
+
+    def resetStatus(self):
+        self.comparing = False
+        self.hasLocation = False
+        self.hasActivity = False
+        self.hasTime = False
+        self.needsRec = False
+        self.question = False
+        self.weatherQuery = False
+        self.hasWeatherWord = False
+        self.isGreeting = False
+        self.invalidLocation = False
+        self.requestInfo["compare"] = None
+        self.requestInfo["time0"] = ""
 
 
 if __name__ == "__main__":
