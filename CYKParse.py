@@ -164,8 +164,7 @@ class VacationParser:
                 ['Noun', 'weather', 0.3],
                 ['Noun', 'activity', 0.1],
                 ['Noun', 'today', 0.05],
-                ['Noun', 'tomorrow', 0.05],
-                ['Noun', 'week', 0.1],
+                ['Noun', 'tomorrow', 0.05]
 
                 # activities
                 ['Noun', 'surfing', 0.01],
