@@ -1,6 +1,5 @@
-# Code for CS 171, Winter, 2021
-
 import Tree
+
 
 class VacationParser:
     # hardcoded list of top 100 cities in California (from Wikipedia)
@@ -61,8 +60,6 @@ class VacationParser:
         'hills', 'valley', 'cajon', 'angeles', 'grove',
         'oaks', 'gate', 'heights', 'barbara', 'monica'
     }
-
-
 
     def __init__(self):
         self.verbose = False
@@ -152,6 +149,9 @@ class VacationParser:
                 ['Verb', 'skydive', 0.02],
                 ['Verb', 'hike', 0.02],
 
+                ['Verb', 'rain', 0.02],
+                ['Verb', 'snow', 0.02],
+
                 ['Adverb', 'now', 0.15],
                 ['Adverb', 'today', 0.15],
                 ['Adverb', 'tomorrow', 0.3],
@@ -220,11 +220,15 @@ class VacationParser:
             self.addLexicon(j, "CitySuffix")
 
     def printV(self, *args):
+        """For debugging"""
         if self.verbose:
             print(*args)
 
-    # A Python implementation of the AIMA CYK-Parse algorithm in Fig. 23.5 (p. 837).
-    def CYKParse(self, words, grammar):
+    def CYKParse(self, words: list[str], grammar):
+        """
+        A Python implementation of the CYK-Parse algorithm.
+        From Artificial Intelligence: A Modern Approach (Russell, Norvig)
+        """
         T = {}
         P = {}
         # Instead of explicitly initializing all P[X, i, k] to 0, store
@@ -273,26 +277,31 @@ class VacationParser:
             self.printV(f"{t}: {T[t]}")
         return T, P
 
-    # Python uses 0-based indexing, requiring some changes from the book's
-    # 1-based indexing: i starts at 0 instead of 1
+
     def subspans(self, N):
+        """
+        CS 171, Prof. Robert Frost
+        Python uses 0-based indexing, requiring some changes from the book's
+        1-based indexing: i starts at 0 instead of 1
+        """
         for length in range(2, N+1):
             for i in range(N+1 - length):
                 k = i + length - 1
                 for j in range(i, k):
                     yield i, j, k
 
-    # These two getXXX functions use yield instead of return so that a single pair can be sent back,
-    # and since that pair is a tuple, Python permits a friendly 'X, p' syntax
-    # in the calling routine.
-
     def getGrammarLexicalRules(self, grammar, word):
+        """
+        CS 171, Prof. Robert Frost
+        These two getXXX functions use yield instead of return so that a single pair can be sent back,
+        and since that pair is a tuple, Python permits a friendly 'X, p' syntax
+        in the calling routine.
+        """
         for rule in grammar['lexicon']:
             if rule[1].lower() == word.lower():
                 yield rule[0], rule[2]
 
     def getGrammarSyntaxRules(self, grammar):
-        rulelist = []
         for rule in grammar['syntax']:
             yield rule[0], rule[1], rule[2], rule[3]
 
@@ -302,9 +311,11 @@ class VacationParser:
     def setVerbose(self, val: bool):
         self.verbose = val
 
-    # There is space for 100 cities, so each city is assigned a probability of 0.01.
-    # All cities are in California only
     def addLexicon(self, city, pos):
+        """
+        There is space for 100 cities, so each city is assigned a probability of 0.01.
+        All cities are in California only.
+        """
         self.weatherGrammar["lexicon"].append(
             [pos, city, 0.01]
         )
@@ -315,7 +326,7 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("what should i do in irvine".split(), c.getGrammarWeather())
+    c.CYKParse("is tomorrow hotter".split(), c.getGrammarWeather())
 
 
 

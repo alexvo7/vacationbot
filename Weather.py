@@ -19,7 +19,7 @@ class OWMWrapper:
 
     # Sends a request for temperature and weather of city.
     # Returns status code
-    def get(self, city):
+    def get(self, city: str):
         if city not in self.DB:
             city = city.lower()
             link = self.LINK + self.CUR_REQ
@@ -40,7 +40,7 @@ class OWMWrapper:
             return status_code
 
     # gets the weekly forecast for a city
-    def getWeekly(self, city):
+    def getWeekly(self, city: str):
         city = city.lower()
 
         link = self.LINK + self.CUR_REQ
@@ -77,24 +77,24 @@ class OWMWrapper:
 
         return status_code
 
-    # gets city temperature for time t, where today = t = 0
-    def getCityTemp(self, city, t=0):
+    def getCityTemp(self, city: str, t=0):
+        """Gets city temperature for time t, where today = t = 0"""
         assert 0 <= t < 8, f"t was {t}"
         if city.lower() in self.DB:
             if t in self.DB[city]:
                 return self.DB[city][t]["temp"]
         return float("NaN")
 
-    # gets city weather for time t, where today = t = 0
-    def getCityWeather(self, city, t=0):
+    def getCityWeather(self, city: str, t=0):
+        """Gets city weather for time t, where today = t = 0"""
         assert 0 <= t < 8, f"t was {t}"
         if city.lower() in self.DB:
             if t in self.DB[city]:
                 return self.DB[city][t]["weather"]
         return "unknown"
 
-    # gets city wind speed (in mph) for time t, where today = t = 0
-    def getCityWind(self, city, t=0):
+    """Gets city wind speed (in mph) for time t, where today = t = 0"""
+    def getCityWind(self, city: str, t=0):
         assert 0 <= t < 8, f"t was {t}"
         if city.lower() in self.DB:
             if t in self.DB[city]:
