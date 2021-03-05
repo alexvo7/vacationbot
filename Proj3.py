@@ -703,7 +703,6 @@ class VacationBot:
 
 
 if __name__ == "__main__":
-    # T, P = CYKParse.CYKParse(['hi', 'I', 'is', 'Peter'], CYKParse.getGrammarWeather())
     user_in = ""
     c = VacationBot(VacationParser(), OWMWrapper(), True)   # remove third param to disable debugging
     while user_in not in ("goodbye", "bye", "bye-bye"):
