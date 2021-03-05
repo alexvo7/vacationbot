@@ -78,7 +78,7 @@ class VacationBot:
         """Associates the chatbot with instances of CYKParser and OWMWrapper objects."""
         self.DEBUG = DEBUG
         self.requestInfo = {
-            'time': 'now',
+            'time': '',
             'location': '',
             'locPrefix': '',
             'locSuffix': '',
@@ -731,7 +731,7 @@ class VacationBot:
 
 if __name__ == "__main__":
     user_in = ""
-    c = VacationBot(VacationParser(), OWMWrapper(), True)   # remove third param to disable debugging
+    c = VacationBot(VacationParser(), OWMWrapper())   # remove third param to disable debugging
     while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
         c.say(user_in)
