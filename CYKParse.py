@@ -66,12 +66,14 @@ class VacationParser:
         self.weatherGrammar = {
             'syntax' : [
                 ['S', 'NP', 'VP', 0.1],
+                ['S', 'VP', 'NP', 0.1],
                 ['S', 'NP', 'Verb', 0.05],
                 ['S', 'Noun', 'VP', 0.05],
-                ['S', 'WQuestion', 'VP', 0.2],
+                ['S', 'WQuestion', 'VP', 0.1],
                 ['S', 'WQuestion', 'S', 0.1],
                 ['S', 'AdverbPhrase', 'VP', 0.1],
                 ['S', 'S', 'PrepPhrase', 0.1],
+                ['S', 'S', 'AdverbPhrase', 0.1],
                 ['S', 'Noun', 'Verb', 0.05],
                 ['S', 'Pronoun', 'Verb', 0.05],
 
@@ -79,9 +81,10 @@ class VacationParser:
                 ['VP', 'VP', 'NP+AdverbPhrase', 0.05],
                 ['VP', 'VP', 'AdverbPhrase', 0.05],
                 ['VP', 'VP', 'Adverb', 0.05],
-                ['VP', 'Verb', 'Noun', 0.1],
-                ['VP', 'Verb', 'VP', 0.1],
-                ['VP', 'Verb', '', 0.2],
+                ['VP', 'Verb', 'Noun', 0.05],
+                ['VP', 'Verb', 'NP', 0.05],
+                ['VP', 'Verb', 'VP', 0.05],
+                ['VP', 'Verb', '', 0.1],
                 ['VP', 'Verb', 'Adjective', 0.1],
                 ['VP', 'AuxVerb', 'VP', 0.07],
                 ['VP', 'AuxVerb', 'Verb', 0.03],
@@ -89,7 +92,8 @@ class VacationParser:
                 ['VP', 'Adverb', 'Verb', 0.1],
 
                 ['NP', 'Article', 'Noun', 0.1],
-                ['NP', 'Adjective', 'Noun', 0.2],
+                ['NP', 'Adjective', 'Noun', 0.1],
+                ['NP', 'Noun', 'Adjective', 0.1],
                 ['NP', 'Pronoun', '', 0.1],
                 ['NP', 'Noun', '', 0.2],
                 ['NP', 'Det', 'Noun', 0.1],
@@ -108,10 +112,12 @@ class VacationParser:
                 ['PrepPhrase', 'Preposition', '', 0.1],
 
                 ['AdverbPhrase', 'PrepPhrase', 'Adverb', 0.3],
-                ['AdverbPhrase', 'Adverb', 'PrepPhrase', 0.3],
+                ['AdverbPhrase', 'Adverb', 'PrepPhrase', 0.2],
                 ['AdverbPhrase', 'Adverb', 'AdverbPhrase', 0.1],
                 ['AdverbPhrase', 'AdverbPhrase', 'Adverb', 0.1],
                 ['AdverbPhrase', 'Adverb', '', 0.2],
+                ['AdverbPhrase', 'DigitPrefix', 'TimeSuffix', 0.09],
+                ['AdverbPhrase', 'DigitPrefix1', 'TimeSuffix1', 0.01],
 
             ],
             'lexicon' : [
@@ -160,11 +166,12 @@ class VacationParser:
                 ['Pronoun', 'I', 0.6],
                 ['Pronoun', 'we', 0.2],
                 ['Pronoun', 'it', 0.2],
-                ['Noun', 'temperature', 0.2],
+                ['Noun', 'temperature', 0.1],
                 ['Noun', 'weather', 0.3],
                 ['Noun', 'activity', 0.1],
-                ['Noun', 'today', 0.05],
-                ['Noun', 'tomorrow', 0.05],
+                ['Noun', 'today', 0.1],
+                ['Noun', 'tomorrow', 0.1],
+                ['Noun', 'week', 0.1],
 
                 # activities
                 ['Noun', 'surfing', 0.01],
@@ -207,6 +214,28 @@ class VacationParser:
                 ['S', 'goodbye', 0.33],
                 ['S', 'bye', 0.33],
                 ['S', 'bye-bye', 0.33],
+
+                # only supports up to 7 days
+                ['DigitPrefix', '0', 0.05],
+                ['DigitPrefix1', '1', 0.5],
+                ['DigitPrefix', '2', 0.05],
+                ['DigitPrefix', '3', 0.05],
+                ['DigitPrefix', '4', 0.05],
+                ['DigitPrefix', '5', 0.05],
+                ['DigitPrefix', '6', 0.05],
+                ['DigitPrefix', '7', 0.05],
+
+                ['DigitPrefix', 'zero', 0.05],
+                ['DigitPrefix1', 'one', 0.5],
+                ['DigitPrefix', 'two', 0.05],
+                ['DigitPrefix', 'three', 0.05],
+                ['DigitPrefix', 'four', 0.05],
+                ['DigitPrefix', 'five', 0.05],
+                ['DigitPrefix', 'six', 0.05],
+                ['DigitPrefix', 'seven', 0.05],
+
+                ['TimeSuffix1', 'day', 0.1],
+                ['TimeSuffix', 'days', 0.9]
             ]
         }
 
@@ -301,6 +330,9 @@ class VacationParser:
                 yield rule[0], rule[2]
 
     def getGrammarSyntaxRules(self, grammar):
+        """
+        CS 171, Prof. Robert Frost
+        """
         for rule in grammar['syntax']:
             yield rule[0], rule[1], rule[2], rule[3]
 
@@ -325,11 +357,6 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("is tomorrow hotter".split(), c.getGrammarWeather())
+    c.CYKParse("will it be hotter in 3 days than in 4 days".split(), c.getGrammarWeather())
 
 
-
-
-# Hi, I am Peter. I am Peter. Hi, my name is Peter. My name is Peter.
-# What is the temperature in Irvine? What is the temperature in Irvine now?
-# What is the temperature in Irvine tomorrow?

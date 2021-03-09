@@ -126,6 +126,8 @@ class VacationBot:
                 print('getSentenceParse:', self.sentenceTree)
         else:
             self.sentenceTree = None
+            if self.DEBUG:
+                print("getSentenceParse:", "couldn't parse sentence")
 
 
     def updateRequestInfo(self):
@@ -250,8 +252,12 @@ class VacationBot:
 
         if self.DEBUG and self.validSentence:
             print("REPLYING")
+
         if self.validSentence:
             if self.isGreeting:
+                if self.DEBUG:
+                    print("\tGREETING")
+
                 greeting_templates = [
                     "How can I help?",
                     "What can I do for you?",
@@ -262,6 +268,9 @@ class VacationBot:
                 return
 
             if self.goodbye:
+                if self.DEBUG:
+                    print("\tGOODBYE")
+
                 bye_templates = [
                     "Have a nice trip, and stay safe.",
                     "Bye-bye! Have a great vacation.",
@@ -272,6 +281,9 @@ class VacationBot:
                 return
 
             if self.invalidLocation and self.requestInfo["locPrefix"] and self.requestInfo["locSuffix"]:
+                if self.DEBUG:
+                    print("\tINVALID CITY NAME")
+
                 loc = self.formatCityName(
                     f"{self.requestInfo['locPrefix']} {self.requestInfo['locSuffix']}"
                 )
@@ -279,6 +291,9 @@ class VacationBot:
                 return
 
             elif self.weatherQuery:
+                if self.DEBUG:
+                    print("\tWEATHER QUERY")
+
                 if not self.hasLocation and not self.hasTime:
                     city1, city2 = tuple(random.sample(tuple(self.HOTSPOTS), 2))
                     city1, city2 = self.formatCityName(city1), self.formatCityName(city2)
@@ -320,6 +335,9 @@ class VacationBot:
                         print(random.choice(templates))
 
             elif self.needsRec:
+                if self.DEBUG:
+                    print("\tUSER NEEDS ADVICE")
+
                 if not (self.hasLocation or self.hasActivity):
                     suggestions = self.citySuggestions(self.HOTSPOTS)
                     loc_rec_template = [
@@ -472,6 +490,9 @@ class VacationBot:
                             print(random.choice(bad_wind_template))
 
             elif not self.needsRec:
+                if self.DEBUG:
+                    print("\tUSER MAKES DECISION TO GO")
+
                 if not self.hasActivity and not self.hasLocation and not self.hasTime:
                     suggestions = self.citySuggestions(self.HOTSPOTS)
                     loc_rec_template = [
@@ -592,30 +613,36 @@ class VacationBot:
                     print("Something went wrong... your sentence may have been worded funny.")
 
             elif self.comparing:
+                if self.DEBUG:
+                    print("\tCOMPARING")
+
                 loc = self.formatCityName(
                     self.getLocation()
                 )
 
-                time = self.requestInfo["time"]
-                time0 = self.requestInfo["time0"]
-                temp = self.getTemperature(loc, time)
-                temp0 = self.getTemperature(loc, time0)
-                comp = self.requestInfo["compareWord"]
+                if loc:
+                    time = self.requestInfo["time"]
+                    time0 = self.requestInfo["time0"]
+                    temp = self.getTemperature(loc, time)
+                    temp0 = self.getTemperature(loc, time0)
+                    comp = self.requestInfo["compareWord"]
 
-                if comp in ("hotter", "warmer"):
-                    if temp > temp0:
-                        print(f"Yes, {time} is {comp} than {time0} in {loc}. "
-                              f"It is {temp}F {time} and {temp0}F {time0}.")
+                    if comp in ("hotter", "warmer"):
+                        if temp > temp0:
+                            print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                                  f"It is {temp}F {time} and {temp0}F {time0}.")
+                        else:
+                            print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                                  f"It is {temp}F {time} and {temp0}F {time0}.")
                     else:
-                        print(f"No, {time} is not {comp} than {time0} in {loc}. "
-                              f"It is {temp}F {time} and {temp0}F {time0}.")
+                        if temp < temp0:
+                            print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                                  f"It is {temp}F {time} and {temp0}F {time0}.")
+                        else:
+                            print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                                  f"It is {temp}F {time} and {temp0}F {time0}.")
                 else:
-                    if temp < temp0:
-                        print(f"Yes, {time} is {comp} than {time0} in {loc}. "
-                              f"It is {temp}F {time} and {temp0}F {time0}.")
-                    else:
-                        print(f"No, {time} is not {comp} than {time0} in {loc}. "
-                              f"It is {temp}F {time} and {temp0}F {time0}.")
+                    print("I need a location to be able to answer that.")
 
         else:
             invalid_templates = [
@@ -731,7 +758,7 @@ class VacationBot:
 
 if __name__ == "__main__":
     user_in = ""
-    c = VacationBot(VacationParser(), OWMWrapper())   # remove third param to disable debugging
+    c = VacationBot(VacationParser(), OWMWrapper(), True)   # remove third param to disable debugging
     while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
         c.say(user_in)
