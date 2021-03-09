@@ -74,15 +74,23 @@ class VacationBot:
         "snow": "snowing"
     }
 
+    NUMBERS = {
+        "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7,
+        "zero": 0, "one": 1, "two": 2, "three": 3,
+        "four": 4, "five": 5, "six": 6, "seven": 7
+    }
+
     def __init__(self, parser: VacationParser, wrapper: OWMWrapper, DEBUG=False):
         """Associates the chatbot with instances of CYKParser and OWMWrapper objects."""
         self.DEBUG = DEBUG
         self.requestInfo = {
-            'time': '',
+            'time': 'now',
+            'timedigit': 0,
             'location': '',
             'locPrefix': '',
             'locSuffix': '',
             'time0': '',        # used when comparing
+            'time0digit': -1,
             'compareWord': '',  # hotter/warmer/colder/cooler
             'weatherWord': '',
             'activity': ''
@@ -92,13 +100,14 @@ class VacationBot:
         self.Wrapper = wrapper
         self.sentenceTree = None
         self.tokens = -1
+        self.statusCode = 200   # status code of last request
 
-        # chatbot state flags
         self.validSentence = False
         self.comparing = False
         self.hasLocation = False
         self.hasActivity = False
         self.hasTime = False
+        self.gettingLocTime = False
         self.needsRec = False
         self.question = False
         self.weatherQuery = False
@@ -116,8 +125,11 @@ class VacationBot:
         """
         sentenceTrees = {k: v for k, v in T.items() if k.startswith('S/0')}
         if sentenceTrees.keys():
-            completeTree = max(sentenceTrees.keys())    # completeTree formatted "S/0/#"
-            if int(completeTree[-1]) + 1 != self.tokens:
+            # completeTree formatted "S/0/#"
+            completeTree = max(sentenceTrees.keys(), key=lambda x: (int(x[4:])))
+            if int(completeTree[4:]) + 1 != self.tokens:
+                if self.DEBUG:
+                    print("getSentenceParse:", "couldn't parse sentence")
                 self.sentenceTree = None
                 return
             self.validSentence = True
@@ -155,11 +167,22 @@ class VacationBot:
             if leaf[0] == "WQuestion":
                 self.question = True
 
-            if leaf[1] in ("today", "tomorrow") and not self.hasTime:
-                self.requestInfo['time'] = leaf[1]
-                self.hasTime = True
+            if leaf[1] == "in":
+                self.gettingLocTime = True
 
-            if not self.hasLocation and leaf[0] in ("Name", "CityPrefix", "CitySuffix"):
+            if not self.comparing:
+                if leaf[1] in ("today", "tomorrow"):
+                    self.requestInfo['time'] = leaf[1]
+                    self.requestInfo["timedigit"] = 0 if leaf[1] == "today" else 1
+                    self.hasTime = True
+                elif self.gettingLocTime:
+                    if leaf[0] in ("DigitPrefix", "DigitPrefix1"):
+                        self.requestInfo["timedigit"] = self.NUMBERS[leaf[1]]
+                    elif leaf[0] in ("TimeSuffix", "TimeSuffix1"):
+                        self.requestInfo["time"] = leaf[1]
+                        self.hasTime = True
+
+            if self.gettingLocTime and leaf[0] in ("Name", "CityPrefix", "CitySuffix"):
                 if leaf[0] == "Name":
                     self.requestInfo["location"] = leaf[1]
                     self.requestInfo["locPrefix"] = ""
@@ -203,34 +226,36 @@ class VacationBot:
                 self.requestInfo["compareWord"] = leaf[1]
 
             if self.comparing:
-                if not self.requestInfo["time0"] and leaf[1] in ("today", "tomorrow"):
-                    time0 = self.requestInfo["time0"] = leaf[1]
-
-                if self.hasLocation:
-                    time0 = self.requestInfo["time0"]
-                    time = self.requestInfo["time"]
-                    loc = self.getLocation()
-
-                    time0_temp = self.getTemperature(loc, time0)
-                    time_temp = self.getTemperature(loc, time)
+                if not self.requestInfo["time0"]:
+                    if leaf[1] in ("today", "tomorrow"):
+                        self.requestInfo['time0'] = leaf[1]
+                        self.requestInfo["time0digit"] = 0 if leaf[1] == "today" else 1
+                    elif self.gettingLocTime:
+                        if leaf[0] in ("DigitPrefix", "DigitPrefix1"):
+                            self.requestInfo["time0digit"] = self.NUMBERS[leaf[1]]
+                        elif leaf[0] in ("TimeSuffix", "TimeSuffix1"):
+                            self.requestInfo["time0"] = leaf[1]
 
     def say(self, sentence: str):
         """Gives user input to chatbot."""
-        if self.DEBUG and sentence == "print":
-            print("PRINT DEBUG")
-            print("\tself.requestInfo: ", self.requestInfo)
-            print("\tself.Wrapper.DB: ", self.Wrapper.DB)
-            self.resetStatus()
+        s = sentence.lower().split()
+        if s[0] == "$debug":
+            if len(s) == 1:
+                self.DEBUG = not self.DEBUG
+                print(f"Debug mode is now {self.DEBUG}.")
+            elif len(s) == 2:
+                self.DEBUG = s[1] == "true"
+                print(f"Debug mode is now {self.DEBUG}.")
+            else:
+                print("Invalid syntax")
             return
-        elif not self.DEBUG and sentence == "print":
-            print("\"print\" is not available if self.DEBUG = False.")
 
         tokens = sentence.lower().split()
         self.tokens = len(tokens)
         self.sentenceTree, _ = self.Parser.CYKParse(tokens, self.Parser.getGrammarWeather())
         self.getSentenceParse(self.sentenceTree)
         self.updateRequestInfo()
-
+        self.reply()
 
     def reply(self):
         """Format a reply to the user, based on what the user wrote."""
@@ -241,6 +266,7 @@ class VacationBot:
             print("self.hasLocation:", self.hasLocation)
             print("self.hasActivity:", self.hasActivity)
             print("self.hasTime:", self.hasTime)
+            print("self.gettingLocTime:", self.gettingLocTime)
             print("self.needsRec:", self.needsRec)
             print("self.question:", self.question)
             print("self.weatherQuery:", self.weatherQuery)
@@ -252,6 +278,9 @@ class VacationBot:
 
         if self.DEBUG and self.validSentence:
             print("REPLYING")
+
+        if self.statusCode != 200:
+            print(f"Something went wrong while calling the OWM API. Status code: {self.statusCode}")
 
         if self.validSentence:
             if self.isGreeting:
@@ -302,7 +331,9 @@ class VacationBot:
                     w = self.weatherAdj(
                         self.requestInfo["weatherWord"]
                     )
-                    time = self.requestInfo["time"]
+                    time = self.formatTime(
+                        self.requestInfo["time"], self.requestInfo["timedigit"]
+                    )
                     print(f"Will it be {w} {time} where?")
                 elif not self.hasTime:
                     loc = self.formatCityName(
@@ -314,11 +345,17 @@ class VacationBot:
                         self.getLocation()
                     )
 
-                    time = self.requestInfo["time"]
-                    temp = self.getTemperature(loc, time)
+                    time = self.formatTime(
+                        self.requestInfo["time"], self.requestInfo["timedigit"]
+                    )
+                    temp = self.getTemperature(loc,
+                                               self.requestInfo["time"],
+                                               self.requestInfo["timedigit"])
                     weather = self.weatherAdj(
-                                    self.getWeather(loc, time)
-                                )
+                        self.getWeather(loc,
+                                        self.requestInfo["time"],
+                                        self.requestInfo["timedigit"])
+                    )
                     if self.hasWeatherWord:
                         w = self.weatherAdj(
                                 self.requestInfo["weatherWord"]
@@ -405,9 +442,15 @@ class VacationBot:
                         self.getLocation()
                     )
 
-                    time = self.requestInfo["time"]
-                    temp = self.getTemperature(loc, time)
-                    wind = self.getWind(loc, time)
+                    time = self.formatTime(
+                        self.requestInfo["time"], self.requestInfo["timedigit"]
+                    )
+                    temp = self.getTemperature(loc,
+                                               self.requestInfo["time"],
+                                               self.requestInfo["timedigit"])
+                    wind = self.getWind(loc,
+                                        self.requestInfo["time"],
+                                        self.requestInfo["timedigit"])
                     activity = self.requestInfo["activity"]
                     good_template = [
                         f"Yes, {loc} is a great place to go {activity} {time}.",
@@ -421,7 +464,11 @@ class VacationBot:
                     else:
                         # arbitrary number, but 20 mph wind must be uncomfortable, so no vacation
                         if wind != "unknown" and float(wind) < 20:
-                            weather = self.weatherAdj(self.getWeather(loc, time))
+                            weather = self.weatherAdj(
+                                self.getWeather(loc,
+                                                self.requestInfo["time"],
+                                                self.requestInfo["timedigit"])
+                            )
 
                             if (activity in self.COASTAL_ACTIVITIES
                                     and loc.lower() in self.COASTAL_CITIES
@@ -464,7 +511,7 @@ class VacationBot:
                                     f"so I suggest you go {activity} another time.",
                                     f"Not only do certain activities become potentially dangerous, "
                                     f"the weather {time} is {weather}, which makes "
-                                    f" it a bad time to go {activity} {time}."
+                                    f"it a bad time to go {activity} {time}."
                                 ]
                                 print(random.choice(bad_weather_template))
                                 return
@@ -489,9 +536,9 @@ class VacationBot:
                             ]
                             print(random.choice(bad_wind_template))
 
-            elif not self.needsRec:
+            elif not self.comparing and not self.needsRec:
                 if self.DEBUG:
-                    print("\tUSER MAKES DECISION TO GO")
+                    print("\tUSER MAKES NO REQUEST")
 
                 if not self.hasActivity and not self.hasLocation and not self.hasTime:
                     suggestions = self.citySuggestions(self.HOTSPOTS)
@@ -523,21 +570,33 @@ class VacationBot:
                     loc = self.formatCityName(
                         self.getLocation()
                     )
-                    time = self.requestInfo["time"]
-
-                    temp, weather, wind = self.getCityInfo(loc, time)
+                    time = self.formatTime(
+                        self.requestInfo["time"], self.requestInfo["timedigit"]
+                    )
+                    temp, weather, wind = self.getCityInfo(loc,
+                                                           self.requestInfo["time"],
+                                                           self.requestInfo["timedigit"])
                     good_template = [
                         f"{loc} is a great place to go {activity} {time}.",
                         f"You should definitely go {activity} there. Great choice!",
                         f"I see nothing wrong with that. Enjoy your trip!"
                     ]
 
+                    if activity in self.COASTAL_ACTIVITIES and loc.lower() not in self.COASTAL_CITIES:
+                        print(f"{loc} isn't a coastal city, so you can't go {activity} there!")
+                        return
+
                     if temp != "unknown" and float(temp) < 50:
                         print(f"The temperature is {temp}F, which is too cold for "
                               f"most activities (except snowy ones).")
+                        return
                     else:
                         if wind != "unknown" and float(wind) < 20:
-                            weather = self.weatherAdj(self.getWeather(loc, time))
+                            weather = self.weatherAdj(
+                                self.getWeather(loc,
+                                                self.requestInfo["time"],
+                                                self.requestInfo["timedigit"])
+                            )
 
                             if (activity in self.COASTAL_ACTIVITIES
                                     and loc.lower() in self.COASTAL_CITIES
@@ -579,7 +638,8 @@ class VacationBot:
                                     f"The weather {time} is {weather}, which may ruin your experience, "
                                     f"so I suggest you go {activity} another time.",
                                     f"Not only do certain activities become potentially dangerous, "
-                                    f"the weather {time} is {weather}, which makes it a bad time to go {activity} {time}."
+                                    f"the weather {time} is {weather}, which makes it a "
+                                    f"bad time to go {activity} {time}."
                                 ]
                                 print(random.choice(bad_weather_template))
                                 return
@@ -604,11 +664,6 @@ class VacationBot:
                             ]
                             print(random.choice(bad_wind_template))
 
-                    if activity in self.COASTAL_ACTIVITIES and loc.lower() not in self.COASTAL_CITIES:
-                        print(f"{loc} isn't a coastal city, so you can't go {activity} there!")
-                    else:
-                        print(f"That's good for you. When will you go {activity}?")
-
                 else:
                     print("Something went wrong... your sentence may have been worded funny.")
 
@@ -621,25 +676,33 @@ class VacationBot:
                 )
 
                 if loc:
-                    time = self.requestInfo["time"]
-                    time0 = self.requestInfo["time0"]
-                    temp = self.getTemperature(loc, time)
-                    temp0 = self.getTemperature(loc, time0)
+                    time = self.formatTime(
+                        self.requestInfo["time"], self.requestInfo["timedigit"]
+                    )
+                    time0 = self.formatTime(
+                        self.requestInfo["time0"], self.requestInfo["time0digit"]
+                    )
+                    temp = self.getTemperature(loc,
+                                               self.requestInfo["time"],
+                                               self.requestInfo["timedigit"])
+                    temp0 = self.getTemperature(loc,
+                                               self.requestInfo["time0"],
+                                               self.requestInfo["time0digit"])
                     comp = self.requestInfo["compareWord"]
 
                     if comp in ("hotter", "warmer"):
                         if temp > temp0:
-                            print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                            print(f"Yes, it is {comp} {time} than {time0} in {loc}. "
                                   f"It is {temp}F {time} and {temp0}F {time0}.")
                         else:
-                            print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                            print(f"No, it is not {comp} {time} than {time0} in {loc}. "
                                   f"It is {temp}F {time} and {temp0}F {time0}.")
                     else:
                         if temp < temp0:
-                            print(f"Yes, {time} is {comp} than {time0} in {loc}. "
+                            print(f"Yes, it is {comp} {time} than {time0} in {loc}. "
                                   f"It is {temp}F {time} and {temp0}F {time0}.")
                         else:
-                            print(f"No, {time} is not {comp} than {time0} in {loc}. "
+                            print(f"No, it is not {comp} {time} than {time0} in {loc}. "
                                   f"It is {temp}F {time} and {temp0}F {time0}.")
                 else:
                     print("I need a location to be able to answer that.")
@@ -652,23 +715,23 @@ class VacationBot:
             print(random.choice(invalid_templates))
 
     ############### UTILITY FUNCTIONS #########################################
-    def getTemperature(self, location: str, time: str):
+    def getTemperature(self, location: str, time: str, t: int):
         """
         Returns the temperature float value in location as a string,
         and returns 'unknown' if it could not be fetched.
         """
-        return self.getCityInfo(location, time)[0]
+        return self.getCityInfo(location, time, t)[0]
 
-    def getWeather(self, location: str, time: str):
+    def getWeather(self, location: str, time: str, t: int):
         """Returns the weather in location, and returns 'unknown' if it could not be fetched."""
-        return self.getCityInfo(location, time)[1]
+        return self.getCityInfo(location, time, t)[1]
 
-    def getWind(self, location: str, time: str):
+    def getWind(self, location: str, time: str, t: int):
         """
         Returns the wind speed float value in location as a string,
         and returns 'unknown' if it could not be fetched.
         """
-        return self.getCityInfo(location, time)[2]
+        return self.getCityInfo(location, time, t)[2]
 
     def getLocation(self):
         """Returns the location in lowercase, and empty string if location doesn't exist."""
@@ -679,7 +742,7 @@ class VacationBot:
         else:
             return ""
 
-    def getCityInfo(self, location: str, time: str):
+    def getCityInfo(self, location: str, time: str, t: int):
         """
         Uses the OWMWrapper object to get weather if it doesn't exist in local DB already.
         Returns "unknown" if location/temp doesn't exist.
@@ -687,31 +750,44 @@ class VacationBot:
         """
         location = location.lower()
         time = time.lower()
-        t = 0
-        if time == "tomorrow":
-            t = 1
-        if time in ("now", "today", "tomorrow"):
+        if time in ("now", "today", "tomorrow", "days"):
             if not (location in self.Wrapper.DB and t in self.Wrapper.DB[location]):
-                if time == "tomorrow":
-                    self.Wrapper.getWeekly(location)
+                if time in ("tomorrow", "days"):
+                    self.statusCode = self.Wrapper.getWeekly(location)
                 else:
-                    self.Wrapper.get(location)
+                    self.statusCode = self.Wrapper.get(location)
+            if self.statusCode == 200:
+                if self.DEBUG:
+                    print(f"getCity methods({location}, t={t})")
+                temp = self.Wrapper.getCityTemp(location, t)
+                weather = self.Wrapper.getCityWeather(location, t)
+                wind = self.Wrapper.getCityWind(location, t)
+                if self.DEBUG:
+                    print(f"getCityInfo {temp}F {weather} {wind}mph, t={t}")
 
-            temp = self.Wrapper.getCityTemp(location, t)
-            weather = self.Wrapper.getCityWeather(location, t)
-            wind = self.Wrapper.getCityWind(location, t)
-            if self.DEBUG:
-                print(f"getTemperature {temp}F {weather} {wind}mph")
-
-            # getCityTemp returns NaN if couldn't get temperature
-            if temp == temp and weather != "unknown" and wind != "unknown":
-                return temp, weather, wind
+                # getCityTemp returns NaN if couldn't get temperature
+                if temp == temp and weather != "unknown" and wind != "unknown":
+                    return temp, weather, wind
+            else:
+                if self.DEBUG:
+                    print(f"getCityInfo status code {self.statusCode}")
 
         return "unknown", "unknown", "unknown"
 
     def formatCityName(self, city: str):
-        """Capitalizes first letter in city names. Ex: san jose -> San Jose, irvine -> Irvine"""
+        """Returns a string of the formatted city name. Ex: san jose -> San Jose, irvine -> Irvine"""
         return " ".join([s.capitalize() for s in city.split()])
+
+    def formatTime(self, time: str, timedigit: int):
+        """Returns a string of the time phrase. Ex: tomorrow -> tomorrow; days,3 -> 'three days' """
+        if time in ("today", "now", "tomorrow"):
+            return time
+        else:
+            if timedigit == 0:
+                return "today"
+            elif timedigit == 1:
+                return "tomorrow"
+            return f"in {str(timedigit)} {time}"
 
     def weatherAdj(self, weather: str):
         """Gets the adjective word of weather. Ex: clouds -> cloudy, clear -> sunny (both are the same)"""
@@ -741,11 +817,13 @@ class VacationBot:
             return random.choice(template)
 
     def resetStatus(self):
-        """Resets the chatbot state after every user query."""
+        """Resets the chatbot state flags after every user query."""
+        self.statusCode = 200
         self.comparing = False
-        self.hasLocation = False
+        self.hasLocation = self.requestInfo["location"] != ""
         self.hasActivity = False
-        self.hasTime = False
+        self.hasTime = self.requestInfo["time"] != ""
+        self.gettingLocTime = False
         self.needsRec = False
         self.question = False
         self.weatherQuery = False
@@ -758,9 +836,10 @@ class VacationBot:
 
 if __name__ == "__main__":
     user_in = ""
-    c = VacationBot(VacationParser(), OWMWrapper(), True)   # remove third param to disable debugging
+
+    # Add third bool param to set debug mode, or type "$debug" to toggle debug mode.
+    c = VacationBot(VacationParser(), OWMWrapper())
     while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
         c.say(user_in)
-        c.reply()
 

@@ -17,7 +17,7 @@ class OWMWrapper:
         # 0-7 in the value dict indicates which day since today. 0 is today, 1 is tomorrow, 7 is next week
         self.DB = {}
 
-    # Sends a request for temperature and weather of city.
+    # Sends a request for current temperature and weather of city.
     # Returns status code
     def get(self, city: str):
         if city not in self.DB:
@@ -113,11 +113,9 @@ class OWMWrapper:
 if __name__ == "__main__":
     w = OWMWrapper()
     # get() or getWeekly() cities here
-    w.get("irvine")
 
 
     # end
-    print(w)
 
 
 

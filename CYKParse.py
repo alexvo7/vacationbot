@@ -66,7 +66,7 @@ class VacationParser:
         self.weatherGrammar = {
             'syntax' : [
                 ['S', 'NP', 'VP', 0.1],
-                ['S', 'VP', 'NP', 0.1],
+                ['S', 'WQuestion', 'NP', 0.1],
                 ['S', 'NP', 'Verb', 0.05],
                 ['S', 'Noun', 'VP', 0.05],
                 ['S', 'WQuestion', 'VP', 0.1],
@@ -95,6 +95,7 @@ class VacationParser:
                 ['NP', 'Adjective', 'Noun', 0.1],
                 ['NP', 'Noun', 'Adjective', 0.1],
                 ['NP', 'Pronoun', '', 0.1],
+                ['NP', 'Pronoun', 'Adjective', 0.1],
                 ['NP', 'Noun', '', 0.2],
                 ['NP', 'Det', 'Noun', 0.1],
                 ['NP', 'Name', '', 0.2],
@@ -123,12 +124,13 @@ class VacationParser:
             'lexicon' : [
                 ['WQuestion', 'what', 0.1],
                 ['WQuestion', 'when', 0.2],
-                ['WQuestion', 'where', 0.2],
+                ['WQuestion', 'where', 0.1],
                 ['WQuestion', 'which', 0.09],
                 ['WQuestion', 'will', 0.01],
                 ['WQuestion', 'could', 0.05],
                 ['WQuestion', 'should', 0.1],
                 ['WQuestion', 'how', 0.1],
+                ['WQuestion', 'can', 0.1],
                 ['WQuestion', 'is', 0.1],
 
                 ['AuxVerb', 'will', 0.33],
@@ -171,7 +173,6 @@ class VacationParser:
                 ['Noun', 'activity', 0.1],
                 ['Noun', 'today', 0.1],
                 ['Noun', 'tomorrow', 0.1],
-                ['Noun', 'week', 0.1],
 
                 # activities
                 ['Noun', 'surfing', 0.01],
@@ -357,6 +358,6 @@ if __name__ == '__main__':
     c = VacationParser()
     c.setVerbose(True)
 
-    c.CYKParse("will it be hotter in 3 days than in 4 days".split(), c.getGrammarWeather())
+    c.CYKParse("is it raining in irvine tomorrow".split(), c.getGrammarWeather())
 
 
