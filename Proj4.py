@@ -80,7 +80,7 @@ class VacationBot:
         "four": 4, "five": 5, "six": 6, "seven": 7
     }
 
-    def __init__(self, parser: VacationParser, wrapper: OWMWrapper, DEBUG=False):
+    def __init__(self, DEBUG=False):
         """Associates the chatbot with instances of CYKParser and OWMWrapper objects."""
         self.DEBUG = DEBUG
         self.requestInfo = {
@@ -96,8 +96,8 @@ class VacationBot:
             'activity': ''
         }
 
-        self.Parser = parser
-        self.Wrapper = wrapper
+        self.Parser = VacationParser()
+        self.Wrapper = OWMWrapper()
         self.sentenceTree = None
         self.tokens = -1
         self.statusCode = 200   # status code of last request
