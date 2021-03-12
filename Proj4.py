@@ -838,7 +838,7 @@ if __name__ == "__main__":
     user_in = ""
 
     # Add third bool param to set debug mode, or type "$debug" to toggle debug mode.
-    c = VacationBot(VacationParser(), OWMWrapper())
+    c = VacationBot()
     while user_in not in ("goodbye", "bye", "bye-bye"):
         user_in = input("User>")
         c.say(user_in)
