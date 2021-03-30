@@ -4,4 +4,4 @@ This is a simple chatbot that I created as a school project. Since the prompt wa
 ## How to use
 Clone the repo, then go into the folder and `pip install requirements.txt`.
 
-Then run Proj4.py
+Run VacationBot.py and interact with the chatbot. Note that the chatbot cannot handle punctuation and can only parse a handful of sentence templates.
